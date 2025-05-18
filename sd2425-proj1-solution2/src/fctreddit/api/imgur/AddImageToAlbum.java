@@ -16,9 +16,9 @@ import java.util.concurrent.ExecutionException;
 
 public class AddImageToAlbum {
 
-	private static final String apiKey = "INSERT YOURS";
-	private static final String apiSecret = "INSERT YOURS";
-	private static final String accessTokenStr = "INSERT YOURS";
+	private static final String apiKey = "7acbc7e0d5ce8fa";
+	private static final String apiSecret = "e6c579220e16ceee0ff776b336a3b63a4a0c4c96";
+	private static final String accessTokenStr = "97847fa95a42a56a0bd792fcb4273f16a27fc871";
 	
 	private static final String ADD_IMAGE_TO_ALBUM_URL = "https://api.imgur.com/3/album/{{albumHash}}/add";
 		
