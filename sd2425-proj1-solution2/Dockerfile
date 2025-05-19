@@ -6,5 +6,9 @@ WORKDIR /home/sd
 ADD hibernate.cfg.xml .
 ADD fctreddit.props .
 
+
+COPY src/fctreddit/security/* ./
+
 # copy the jar created by assembly to the docker image
 COPY target/*jar-with-dependencies.jar sd2425.jar
+

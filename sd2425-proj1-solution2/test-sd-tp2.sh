@@ -11,6 +11,7 @@ then
 fi 
 
 #execute the client with the given command line parameters
-docker pull smduarte/sd2425-tester-tp1
-docker run --rm --network=sdnet -it -v /var/run/docker.sock:/var/run/docker.sock smduarte/sd2425-tester-tp1:latest $*
+docker pull smduarte/sd2425testerbase
+docker pull smduarte/sd2425-tester-tp2
+docker run --rm --name=tester --network=sdnet -it -v /var/run/docker.sock:/var/run/docker.sock smduarte/sd2425-tester-tp2:latest $*
 
