@@ -10,6 +10,8 @@ import org.glassfish.jersey.server.ResourceConfig;
 import fctreddit.impl.server.Discovery;
 import fctreddit.impl.server.java.JavaContent;
 
+import javax.net.ssl.SSLContext;
+
 public class ContentServer {
 
 	private static Logger Log = Logger.getLogger(ContentServer.class.getName());
@@ -19,9 +21,9 @@ public class ContentServer {
 		System.setProperty("java.util.logging.SimpleFormatter.format", "%4$s: %5$s\n");
 	}
 	
-	public static final int PORT = 8080;
+	public static final int PORT = 8082;
 	public static final String SERVICE = "Content";
-	private static final String SERVER_URI_FMT = "http://%s:%s/rest";
+	private static final String SERVER_URI_FMT = "https://%s:%s/rest";
 	
 	public static void main(String[] args) {
 		try {
@@ -29,12 +31,12 @@ public class ContentServer {
 			ResourceConfig config = new ResourceConfig();
 			config.register(ContentResource.class);
 	
-			String ip = InetAddress.getLocalHost().getHostAddress();
-			String serverURI = String.format(SERVER_URI_FMT, ip, PORT);
+			String hostname = InetAddress.getLocalHost().getHostName();
+			String serverURI = String.format(SERVER_URI_FMT, hostname, PORT);
 			
 			JavaContent.setServerURI(serverURI);
 			
-			JdkHttpServerFactory.createHttpServer( URI.create(serverURI), config);
+			JdkHttpServerFactory.createHttpServer( URI.create(serverURI), config, SSLContext.getDefault());
 		
 			Log.info(String.format("%s Server ready @ %s\n",  SERVICE, serverURI));
 			
