@@ -18,3 +18,25 @@ CONTENT_GRPC_PORT=9002
 CONTENT_GRPC_EXTRA_ARGS=
 DISCOVERY_MULTICAST_IP=226.226.226.226
 DISCOVERY_MULTICAST_PORT=2266
+CLIENT_TRUSTSTORE=<trustore> ; formato: filename,password
+USERS_KEYSTORES=<keystores do serviço users>; formato: users-1,filename,password
+IMAGE_KEYSTORES=<keystores do serviço image>; formato: image-1,filename1,password1 image-2,filename2,password2
+CONTENT_KEYSTORES=<keystores do serviço content>; formato: content-1,filename1,password1 content-2,filename2,password2 content-3,filename3,password3
+
+IMAGE_PROXY_MAINCLASS=
+IMAGE_PROXY_EXTRA_ARGS=<eventais parâmetros adicionais a passar ao Proxy>
+IMAGE_PROXY_PORT=<porto do servidor Proxy>
+IMAGE_PROXY_PROTO=<tipo do servidor Proxy>; valores esperados: rest ou grpc
+
+USERS_REST_EXTRA_ARGS=<eventais parâmetros adicionais a passar ao servidor Users REST>
+IMAGE_REST_EXTRA_ARGS=<eventais parâmetros adicionais a passar ao servidor Image REST>
+CONTENT_REST_EXTRA_ARGS=<eventais parâmetros adicionais a passar ao servidor Content REST>
+
+USERS_GRPC_EXTRA_ARGS=<eventais parâmetros adicionais a passar ao servidor Users GRPC>
+IMAGE_GRPC_EXTRA_ARGS=<eventais parâmetros adicionais a passar ao servidor Image GRPC>
+CONTENT_GRPC_EXTRA_ARGS=<eventais parâmetros adicionais a passar ao servidor Content GRPC>
+
+CONTENT_REP_SERVER_MAINCLASS=<classe main do servidor Content replicado>,
+CONTENT_REP_PORT=<porto do servidor Content replicado>,
+CONTENT_REP_EXTRA_ARGS_FIRST=<eventais parâmetros adicionais a passar ao servidor Content replicado que iniciará como primário, se aplicável>
+CONTENT_REP_EXTRA_ARGS_OTHER=<eventais parâmetros adicionais a passar aos servidores Content replicado secundários, se aplicável>
