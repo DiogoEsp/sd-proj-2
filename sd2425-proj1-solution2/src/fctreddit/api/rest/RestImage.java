@@ -10,6 +10,9 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+
 @Path(RestImage.PATH)
 public interface RestImage {
 
@@ -29,7 +32,7 @@ public interface RestImage {
 	@POST
 	@Path("{" + USER_ID + "}")
 	@Consumes(MediaType.APPLICATION_OCTET_STREAM)
-	String createImage(@PathParam(USER_ID) String userId, byte[] imageContents, @QueryParam(PASSWORD) String password);
+	String createImage(@PathParam(USER_ID) String userId, byte[] imageContents, @QueryParam(PASSWORD) String password) throws IOException, ExecutionException, InterruptedException;
 
 	/**
 	 * Gets the contents of an image associated with the imageId

@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
@@ -17,7 +18,7 @@ import com.github.scribejava.core.model.Verb;
 import com.github.scribejava.core.oauth.OAuth20Service;
 import com.google.gson.Gson;
 import fctreddit.api.User;
-import fctreddit.api.imgur.data.CreateAlbumArguments;
+import fctreddit.api.imgur.data.*;
 import fctreddit.api.java.Image;
 import fctreddit.api.java.Result;
 import fctreddit.api.java.Result.ErrorCode;
@@ -47,6 +48,19 @@ public class JavaImage extends JavaServer implements Image {
 	
 	private static final Path baseDirectory = Path.of("home", "sd", "images");
 
+
+	class AlbumListResponse {
+		private List<Album> data;
+		public List<Album> getData() { return data; }
+	}
+
+	// Album object
+	class Album {
+		private String id;
+		private String title;
+		public String getId() { return id; }
+		public String getTitle() { return title; }
+	}
 	public JavaImage() {
 		json = new Gson();
 		accessToken = new OAuth2AccessToken(accessTokenStr);
@@ -63,38 +77,71 @@ public class JavaImage extends JavaServer implements Image {
 	@Override
 	public Result<String> createImage(String userId, byte[] imageContents, String password) throws IOException, ExecutionException, InterruptedException {
 
-		Result<User> owner = getUsersClient().getUser(userId, password);
+		/**Result<User> owner = getUsersClient().getUser(userId, password);
 
 		if (!owner.isOK())
 			return Result.error(owner.error());
 
 		String id = null;
 
-		//get do album
-		String requestURL = ADD_IMAGE_TO_ALBUM_URL.replaceAll("\\{\\{albumHash\\}\\}",ALBUM_NAME);
-		OAuthRequest request = new OAuthRequest(Verb.GET, requestURL);
-		request.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
-		service.signRequest(accessToken, request);
-		Response response = service.execute(request);
+		// 1. Verificar se o álbum existe
+		String albumId = null;
+		OAuthRequest listAlbumsRequest = new OAuthRequest(Verb.GET, "https://api.imgur.com/3/account/me/albums/");
+		service.signRequest(accessToken, listAlbumsRequest);
+		Response listAlbumsResponse = service.execute(listAlbumsRequest);
 
-		//se o album n existir fazê-lo
-		if(response.getCode() != HTTP_SUCCESS){
-			request = new OAuthRequest(Verb.POST, CREATE_ALBUM_URL);
-
-			request.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
-			request.setPayload(json.toJson(new CreateAlbumArguments(ALBUM_NAME, ALBUM_NAME)));
-
-			service.signRequest(accessToken, request);
-			try {
-				service.execute(request);
-			}
-			catch (InterruptedException | ExecutionException | IOException e) {
-				e.printStackTrace();
-				return Result.error(ErrorCode.INTERNAL_ERROR);
+		if (listAlbumsResponse.getCode() == HTTP_SUCCESS) {
+			AlbumListResponse albums = json.fromJson(listAlbumsResponse.getBody(), AlbumListResponse.class);
+			for (Album album : albums.getData()) {
+				if (ALBUM_NAME.equals(album.getTitle())) {
+					albumId = album.getId();
+					break;
+				}
 			}
 		}
 
+		// Se não existir, criar o álbum
+		if (albumId == null) {
+			OAuthRequest createAlbumReq = new OAuthRequest(Verb.POST, CREATE_ALBUM_URL);
+			createAlbumReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
+			createAlbumReq.setPayload(json.toJson(new CreateAlbumArguments(ALBUM_NAME, ALBUM_NAME)));
+			service.signRequest(accessToken, createAlbumReq);
+			Response createAlbumResp = service.execute(createAlbumReq);
 
+			if (createAlbumResp.getCode() != HTTP_SUCCESS) {
+				return Result.error(ErrorCode.INTERNAL_ERROR);
+			}
+
+			BasicResponse albumResp = json.fromJson(createAlbumResp.getBody(), BasicResponse.class);
+			albumId = albumResp.getData().get("id").toString();
+		}
+
+		// 2. Fazer upload da imagem
+		ImageUploadArguments uploadArgs = new ImageUploadArguments(imageContents, "imageTitle" );
+		OAuthRequest uploadReq = new OAuthRequest(Verb.POST, UPLOAD_IMAGE_URL);
+		uploadReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
+		uploadReq.setPayload(json.toJson(uploadArgs));
+		service.signRequest(accessToken, uploadReq);
+		Response uploadResp = service.execute(uploadReq);
+
+		if (uploadResp.getCode() != HTTP_SUCCESS) {
+			return Result.error(ErrorCode.INTERNAL_ERROR);
+		}
+
+		BasicResponse uploadResponse = json.fromJson(uploadResp.getBody(), BasicResponse.class);
+		String imageId = uploadResponse.getData().get("id").toString();
+
+		// 3. Retornar o ID da imagem
+		return Result.ok(imageId);**/
+
+
+		Result<User> owner = getUsersClient().getUser(userId, password);
+
+		if (!owner.isOK())
+			return Result.error(owner.error());
+
+		String id = null;
+		Path image = null;
 
 		// check if user directory exists
 		Path userDirectory = Path.of(baseDirectory.toString(), userId);
@@ -120,9 +167,9 @@ public class JavaImage extends JavaServer implements Image {
 				return Result.error(ErrorCode.INTERNAL_ERROR);
 			}
 		}
-		
+
 		Log.info("Created image with id " + id + " for user " + userId);
-		
+
 		return Result.ok(id);
 	}
 
