@@ -19,42 +19,42 @@ import io.netty.handler.ssl.SslContextBuilder;
 import javax.net.ssl.KeyManagerFactory;
 
 public class ContentServer {
-public static final int PORT = 9002;
+    public static final int PORT = 9002;
 
-	private static final String GRPC_CTX = "/grpc";
-	private static final String SERVER_BASE_URI = "grpc://%s:%s%s";
-	private static final String SERVICE = "Content";
-	
-	private static Logger Log = Logger.getLogger(ContentServer.class.getName());
-	
-	public static void main(String[] args) throws Exception {
+    private static final String GRPC_CTX = "/grpc";
+    private static final String SERVER_BASE_URI = "grpc://%s:%s%s";
+    private static final String SERVICE = "Content";
 
-		String KeyStoreFilename = System.getProperty("javax.net.ssl.KeyStore");
-		String KeyStorePassword = System.getProperty("javax.net.ssl.KeyStorePassword");
+    private static Logger Log = Logger.getLogger(ContentServer.class.getName());
 
-		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+    public static void main(String[] args) throws Exception {
 
-		try(FileInputStream input = new FileInputStream(KeyStoreFilename)){
-			keyStore.load(input, KeyStorePassword.toCharArray());
-		}
+        String KeyStoreFilename = System.getProperty("javax.net.ssl.keyStore");
+        String KeyStorePassword = System.getProperty("javax.net.ssl.keyStorePassword");
 
-		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(
-				KeyManagerFactory.getDefaultAlgorithm());
-		keyManagerFactory.init(keyStore, KeyStorePassword.toCharArray());
+        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
 
-		GrpcContentServerStub stub = new GrpcContentServerStub();
+        try (FileInputStream input = new FileInputStream(KeyStoreFilename)) {
+            keyStore.load(input, KeyStorePassword.toCharArray());
+        }
 
-		SslContext context = GrpcSslContexts.configure(SslContextBuilder.forServer(keyManagerFactory)).build();
-		Server server = NettyServerBuilder.forPort(PORT).addService(stub).sslContext(context).build();
-		String serverURI = String.format(SERVER_BASE_URI, InetAddress.getLocalHost().getHostName(), PORT, GRPC_CTX);
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(
+                KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, KeyStorePassword.toCharArray());
 
-		JavaContent.setServerURI(serverURI);
-		
-		Discovery discovery = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
-		discovery.start();
-		JavaContent.setDiscovery(discovery);
-		
-		Log.info(String.format("Image gRPC Server ready @ %s\n", serverURI));
-		server.start().awaitTermination();
-	}
+        GrpcContentServerStub stub = new GrpcContentServerStub();
+
+        SslContext context = GrpcSslContexts.configure(SslContextBuilder.forServer(keyManagerFactory)).build();
+        Server server = NettyServerBuilder.forPort(PORT).addService(stub).sslContext(context).build();
+        String serverURI = String.format(SERVER_BASE_URI, InetAddress.getLocalHost().getHostName(), PORT, GRPC_CTX);
+
+        JavaContent.setServerURI(serverURI);
+
+        Discovery discovery = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
+        discovery.start();
+        JavaContent.setDiscovery(discovery);
+
+        Log.info(String.format("Image gRPC Server ready @ %s\n", serverURI));
+        server.start().awaitTermination();
+    }
 }

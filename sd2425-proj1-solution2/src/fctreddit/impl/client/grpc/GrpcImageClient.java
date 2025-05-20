@@ -32,8 +32,14 @@ public class GrpcImageClient extends ImageClient {
 	
 	public GrpcImageClient(URI serverURI) {
 		super(serverURI);
-		Channel channel = ManagedChannelBuilder.forAddress(serverURI.getHost(), serverURI.getPort()).usePlaintext()
-				.enableRetry().build();
+		Channel channel = null;
+		try {
+			channel = GrpcUtil.buildChannel(serverURI);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(0);
+		}
+
 		stub = ImageGrpc.newBlockingStub(channel);
 	}
 

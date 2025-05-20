@@ -19,9 +19,9 @@ CONTENT_GRPC_EXTRA_ARGS=
 DISCOVERY_MULTICAST_IP=226.226.226.226
 DISCOVERY_MULTICAST_PORT=2266
 CLIENT_TRUSTSTORE=truststore.ks,changeit
-USERS_KEYSTORES=users-1,users-server.ks,password
-IMAGE_KEYSTORES=image-1,image-server.ks,password image-2,image2-server.ks,password
-CONTENT_KEYSTORES=content-1,content-server.ks,password content-2,content2-server.ks,password2 content-3,content3-server.ks,password
+USERS_KEYSTORES=users-1,users-1-server.ks,password
+IMAGE_KEYSTORES=image-1,image-1-server.ks,password image-2,image-2-server.ks,password
+CONTENT_KEYSTORES=content-1,content-1-server.ks,password content-2,content-2-server.ks,password2 content-3,content-3-server.ks,password
 
 IMAGE_PROXY_MAINCLASS=
 IMAGE_PROXY_EXTRA_ARGS=
