@@ -10,6 +10,9 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+
 @Path(RestImage.PATH)
 public interface RestImage {
 

@@ -6,6 +6,9 @@ import fctreddit.api.rest.RestImage;
 import fctreddit.impl.server.java.JavaImage;
 import jakarta.ws.rs.WebApplicationException;
 
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+
 public class ImageResource extends RestResource implements RestImage {
 
 	Image impl;
@@ -23,9 +26,18 @@ public class ImageResource extends RestResource implements RestImage {
 	}
 	
 	@Override
-	public String createImage(String userId, byte[] imageContents, String password) {
-		Result<String> res = impl.createImage(userId, imageContents, password);
-		
+	public String createImage(String userId, byte[] imageContents, String password){
+		Result<String> res = null;
+		try {
+			res = impl.createImage(userId, imageContents, password);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+
 		if(res.isOK())
 			return ImageResource.baseURI + RestImage.PATH + "/" + userId + "/" + res.value();
 		
