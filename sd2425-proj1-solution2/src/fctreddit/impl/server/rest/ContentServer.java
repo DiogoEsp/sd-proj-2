@@ -21,7 +21,7 @@ public class ContentServer {
 		System.setProperty("java.util.logging.SimpleFormatter.format", "%4$s: %5$s\n");
 	}
 	
-	public static final int PORT = 8082;
+	public static final int PORT = 8080;
 	public static final String SERVICE = "Content";
 	private static final String SERVER_URI_FMT = "https://%s:%s/rest";
 	

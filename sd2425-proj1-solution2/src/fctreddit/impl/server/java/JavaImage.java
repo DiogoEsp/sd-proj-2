@@ -75,7 +75,7 @@ public class JavaImage extends JavaServer implements Image {
 	}
 
 	@Override
-	public Result<String> createImage(String userId, byte[] imageContents, String password) throws IOException, ExecutionException, InterruptedException {
+	public Result<String> createImage(String userId, byte[] imageContents, String password) {
 
 		/**Result<User> owner = getUsersClient().getUser(userId, password);
 

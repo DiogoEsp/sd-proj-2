@@ -17,6 +17,9 @@ import io.grpc.BindableService;
 import io.grpc.ServerServiceDefinition;
 import io.grpc.stub.StreamObserver;
 
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+
 public class GrpcImageServerStub extends GrpcStub implements ImageGrpc.AsyncService, BindableService {
 
 	private Image impl = new JavaImage();
@@ -35,9 +38,18 @@ public class GrpcImageServerStub extends GrpcStub implements ImageGrpc.AsyncServ
 	
 	@Override
 	public void createImage(CreateImageArgs request, StreamObserver<CreateImageResult> responseObserver) {
-		Result<String> res = impl.createImage(request.getUserId(), request.getImageContents().toByteArray()
-				, request.getPassword());
-		
+		Result<String> res = null;
+		try {
+			res = impl.createImage(request.getUserId(), request.getImageContents().toByteArray()
+					, request.getPassword());
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+
 		if (! res.isOK() )
 			responseObserver.onError(errorCodeToStatus(res.error()));
 		else {

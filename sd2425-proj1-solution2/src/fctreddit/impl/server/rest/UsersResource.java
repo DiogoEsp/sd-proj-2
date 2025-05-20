@@ -27,6 +27,7 @@ public class UsersResource extends RestResource implements RestUsers {
 	@Override
 	public String createUser(User user) {
 		Log.info("createUser : " + user);
+		System.out.println("\"createUser : \" + user");
 		
 		Result<String> res = impl.createUser(user);
 		if(!res.isOK()) {

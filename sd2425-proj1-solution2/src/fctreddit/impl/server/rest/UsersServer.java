@@ -27,7 +27,7 @@ public class UsersServer {
 	
 	public static void main(String[] args) {
 		try {
-			
+			System.out.println("server");
 			ResourceConfig config = new ResourceConfig();
 			config.register(UsersResource.class);
 	

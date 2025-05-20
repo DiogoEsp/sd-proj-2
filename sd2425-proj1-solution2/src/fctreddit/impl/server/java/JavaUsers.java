@@ -26,6 +26,8 @@ public class JavaUsers extends JavaServer implements Users {
 	public Result<String> createUser(User user) {
 		Log.info("createUser : " + user);
 
+		System.out.println("got into java");
+
 		// Check if user data is valid
 		if (user.getUserId() == null || user.getUserId().isBlank() || user.getPassword() == null
 				|| user.getPassword().isBlank() || user.getFullName() == null || user.getFullName().isBlank()
