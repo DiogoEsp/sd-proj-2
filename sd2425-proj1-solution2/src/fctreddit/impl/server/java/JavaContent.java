@@ -51,7 +51,10 @@ public class JavaContent extends JavaServer implements Content {
 		if (userPassword == null)
 			return Result.error(ErrorCode.FORBIDDEN);
 
+		System.out.println("arcadia 0");
 		Users uc = getUsersClient();
+
+		System.out.println("arcadia 1");
 
 		Log.info("Using Users client: " + uc.getClass().getCanonicalName());
 		Log.info("Users server uri: " + ((UsersClient) uc).getServerURI());
@@ -60,9 +63,10 @@ public class JavaContent extends JavaServer implements Content {
 			Log.info("Could not retrieve user information for: " + post.getAuthorId() + " -> " + owner.toString());
 			return Result.error(owner.error());
 		}
-
+		System.out.println("arcadia 2");
 		TX tx = hibernate.beginTransaction();
 
+		System.out.println("arcadia 3");
 		if (post.getParentUrl() != null && !post.getParentUrl().isBlank()) {
 			String postID = extractResourceID(post.getParentUrl());
 			Log.info("Trying to check if parent post exists: " + postID);
@@ -79,6 +83,7 @@ public class JavaContent extends JavaServer implements Content {
 
 		Log.info("Trying to store post");
 
+		System.out.println("arcadia 4");
 		while (true) {
 			post.setPostId(UUID.randomUUID().toString());
 			try {
