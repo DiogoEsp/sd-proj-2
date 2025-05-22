@@ -38,7 +38,7 @@ public class JavaImgur extends JavaServer implements Image {
     private final Gson json;
     private final OAuth20Service service;
     private final OAuth2AccessToken accessToken;
-    private String album = "somthing";
+    private static String albumName;
 
     class AlbumListResponse {
         private List<Album> data;
@@ -57,12 +57,6 @@ public class JavaImgur extends JavaServer implements Image {
         json = new Gson();
         accessToken = new OAuth2AccessToken(accessTokenStr);
         service = new ServiceBuilder(apiKey).apiSecret(apiSecret).build(ImgurApi.instance());
-    }
-
-    public void associateAlbum(){
-        album = "something";
-        // TODO
-        //ver se o album existe se nao existir criar.
     }
 
     @Override
@@ -127,11 +121,16 @@ public class JavaImgur extends JavaServer implements Image {
 
     @Override
     public Result<byte[]> getImage(String userId, String imageId) {
-        return null;
+
     }
 
     @Override
     public Result<Void> deleteImage(String userId, String imageId, String password) {
         return null;
     }
+
+    public static void setHostName(String hostName){
+        albumName = hostName;
+    }
+
 }

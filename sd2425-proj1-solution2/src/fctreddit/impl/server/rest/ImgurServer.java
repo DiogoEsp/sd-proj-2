@@ -22,7 +22,7 @@ public class ImgurServer{
     }
 
     public static final int PORT = 8080;
-    public static final String SERVICE = "Image";
+    public static final String SERVICE = "Imgur";
     private static final String SERVER_URI_FMT = "https://%s:%s/rest";
 
 
@@ -43,6 +43,7 @@ public class ImgurServer{
 
             Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
             JavaImgur.setDiscovery(d);
+            JavaImgur.setHostName(hostname);
             d.start();
 
             //More code can be executed here...
