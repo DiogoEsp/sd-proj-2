@@ -19,7 +19,7 @@ import fctreddit.impl.client.UsersClient;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-public class JavaImgur implements Image {
+public class JavaImgur extends JavaServer implements Image {
 
     private static final String apiKey = "7acbc7e0d5ce8fa";
     private static final String apiSecret = "e6c579220e16ceee0ff776b336a3b63a4a0c4c96";
@@ -38,6 +38,7 @@ public class JavaImgur implements Image {
     private final Gson json;
     private final OAuth20Service service;
     private final OAuth2AccessToken accessToken;
+    private String album = "somthing";
 
     class AlbumListResponse {
         private List<Album> data;
@@ -58,12 +59,18 @@ public class JavaImgur implements Image {
         service = new ServiceBuilder(apiKey).apiSecret(apiSecret).build(ImgurApi.instance());
     }
 
+    public void associateAlbum(){
+        album = "something";
+        // TODO
+        //ver se o album existe se nao existir criar.
+    }
+
     @Override
     public Result<String> createImage(String userId, byte[] imageContents, String password) throws IOException, ExecutionException, InterruptedException {
-       /** Result<User> owner = getUsersClient().getUser(userId, password);
+        Result<User> owner = getUsersClient().getUser(userId, password);
 
         if (!owner.isOK())
-            return Result.error(owner.error());*/
+            return Result.error(owner.error());
 
         String id = null;
 

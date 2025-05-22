@@ -23,9 +23,9 @@ USERS_KEYSTORES=users-1,users-1-server.ks,password
 IMAGE_KEYSTORES=image-1,image-1-server.ks,password image-2,image-2-server.ks,password
 CONTENT_KEYSTORES=content-1,content-1-server.ks,password content-2,content-2-server.ks,password2 content-3,content-3-server.ks,password
 
-IMAGE_PROXY_MAINCLASS=
+IMAGE_PROXY_MAINCLASS=fctreddit.impl.server.rest.ImgurServer.java
 IMAGE_PROXY_EXTRA_ARGS=
-IMAGE_PROXY_PORT=
+IMAGE_PROXY_PORT=8000
 IMAGE_PROXY_PROTO=
 
 USERS_REST_EXTRA_ARGS=
