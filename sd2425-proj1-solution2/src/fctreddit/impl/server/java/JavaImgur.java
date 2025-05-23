@@ -33,12 +33,11 @@ public class JavaImgur extends JavaServer implements Image {
     private static final int HTTP_SUCCESS = 200;
     private static final String CONTENT_TYPE_HDR = "Content-Type";
     private static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
-    private static final String ALBUM_NAME = "SD";
-
     private final Gson json;
     private final OAuth20Service service;
     private final OAuth2AccessToken accessToken;
     private static String albumName;
+    private String albumId;
 
     class AlbumListResponse {
         private List<Album> data;
@@ -68,27 +67,15 @@ public class JavaImgur extends JavaServer implements Image {
 
         String id = null;
 
-        // 1. Verificar se o álbum existe
-        String albumId = null;
-        OAuthRequest listAlbumsRequest = new OAuthRequest(Verb.GET, "https://api.imgur.com/3/account/me/albums/");
-        service.signRequest(accessToken, listAlbumsRequest);
-        Response listAlbumsResponse = service.execute(listAlbumsRequest);
-
-        if (listAlbumsResponse.getCode() == HTTP_SUCCESS) {
-            AlbumListResponse albums = json.fromJson(listAlbumsResponse.getBody(), AlbumListResponse.class);
-            for (Album album : albums.getData()) {
-                if (ALBUM_NAME.equals(album.getTitle())) {
-                    albumId = album.getId();
-                    break;
-                }
-            }
+        if(albumId == null) {
+            checkAlbum();
         }
 
         // Se não existir, criar o álbum
         if (albumId == null) {
             OAuthRequest createAlbumReq = new OAuthRequest(Verb.POST, CREATE_ALBUM_URL);
             createAlbumReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
-            createAlbumReq.setPayload(json.toJson(new CreateAlbumArguments(ALBUM_NAME, ALBUM_NAME)));
+            createAlbumReq.setPayload(json.toJson(new CreateAlbumArguments(albumName, albumName)));
             service.signRequest(accessToken, createAlbumReq);
             Response createAlbumResp = service.execute(createAlbumReq);
 
@@ -120,8 +107,27 @@ public class JavaImgur extends JavaServer implements Image {
     }
 
     @Override
-    public Result<byte[]> getImage(String userId, String imageId) {
+    public Result<byte[]> getImage(String userId, String imageId) throws IOException, ExecutionException, InterruptedException {
 
+        if(albumId == null)
+            checkAlbum();
+
+        if(albumId == null){
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+        }
+
+        String request = GET_IMAGE_URL.replaceAll("\\{\\{imageId\\}\\}", imageId);
+        OAuthRequest albumReq = new OAuthRequest(Verb.GET, request);
+        albumReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
+        service.signRequest(accessToken, albumReq);
+        Response albumResp = service.execute(albumReq);
+
+        if(albumResp.getCode() != HTTP_SUCCESS){
+            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
+        }
+
+
+        return null;
     }
 
     @Override
@@ -131,6 +137,24 @@ public class JavaImgur extends JavaServer implements Image {
 
     public static void setHostName(String hostName){
         albumName = hostName;
+    }
+
+    //checka se o album já tá no imgur
+    private void checkAlbum() throws IOException, ExecutionException, InterruptedException {
+
+            OAuthRequest listAlbumsRequest = new OAuthRequest(Verb.GET, "https://api.imgur.com/3/account/me/albums/");
+            service.signRequest(accessToken, listAlbumsRequest);
+            Response listAlbumsResponse = service.execute(listAlbumsRequest);
+
+            if (listAlbumsResponse.getCode() == HTTP_SUCCESS) {
+                AlbumListResponse albums = json.fromJson(listAlbumsResponse.getBody(), AlbumListResponse.class);
+                for (Album album : albums.getData()) {
+                    if (albumName.equals(album.getTitle())) {
+                        albumId = album.getId();
+                        break;
+                    }
+                }
+            }
     }
 
 }

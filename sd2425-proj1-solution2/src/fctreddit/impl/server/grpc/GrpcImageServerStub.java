@@ -61,8 +61,13 @@ public class GrpcImageServerStub extends GrpcStub implements ImageGrpc.AsyncServ
 
 	@Override
 	public void getImage(GetImageArgs request, StreamObserver<GetImageResult> responseObserver) {
-		Result<byte[]> res = impl.getImage(request.getUserId(), request.getImageId());
-		
+		Result<byte[]> res = null;
+		try {
+			res = impl.getImage(request.getUserId(), request.getImageId());
+		} catch (IOException | ExecutionException | InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+
 		if(! res.isOK() )
 			responseObserver.onError(errorCodeToStatus(res.error()));
 		else {

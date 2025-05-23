@@ -45,7 +45,12 @@ public class ImgurResource extends RestResource implements RestImage {
 
     @Override
     public byte[] getImage(String userId, String imageId) {
-        Result<byte[]> res = impl.getImage(userId, imageId);
+        Result<byte[]> res = null;
+        try {
+            res = impl.getImage(userId, imageId);
+        } catch (IOException | ExecutionException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         if (res.isOK())
             return res.value();

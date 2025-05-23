@@ -23,7 +23,7 @@ public interface Image {
 	 * @return <OK, byte[]> the case of success returning the bytes of the image exists
 	 *  	   NOT_FOUND should be returned if the image does not exists
 	 */
-	Result<byte[]> getImage(String userId, String imageId);
+	Result<byte[]> getImage(String userId, String imageId) throws IOException, ExecutionException, InterruptedException;
 	
 	/**
 	 * Deletes an image identified by imageId
