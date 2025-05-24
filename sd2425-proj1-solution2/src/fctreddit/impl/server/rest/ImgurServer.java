@@ -1,7 +1,6 @@
 package fctreddit.impl.server.rest;
 
 import fctreddit.impl.server.Discovery;
-import fctreddit.impl.server.java.JavaImage;
 import fctreddit.impl.server.java.JavaImgur;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -14,7 +13,7 @@ import java.util.logging.Logger;
 public class ImgurServer{
 
 
-    private static Logger Log = Logger.getLogger(ImageServer.class.getName());
+    private static Logger Log = Logger.getLogger(ImgurServer.class.getName());
 
     static {
         System.setProperty("java.net.preferIPv4Stack", "true");
@@ -22,7 +21,7 @@ public class ImgurServer{
     }
 
     public static final int PORT = 8080;
-    public static final String SERVICE = "Imgur";
+    public static final String SERVICE = "Image";
     private static final String SERVER_URI_FMT = "https://%s:%s/rest";
 
 

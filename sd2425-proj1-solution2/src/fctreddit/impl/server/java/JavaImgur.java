@@ -31,6 +31,7 @@ public class JavaImgur extends JavaServer implements Image {
     private static final String GET_ALBUM_URL = "https://api.imgur.com/3/album/{{albumHash}}";
     private static final String GET_IMAGE_URL = "https://api.imgur.com/3/image/{{imageId}}";
     private static final int HTTP_SUCCESS = 200;
+    private static final int HTTP_NOT_FOUND = 404;
     private static final String CONTENT_TYPE_HDR = "Content-Type";
     private static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
     private final Gson json;
@@ -60,11 +61,14 @@ public class JavaImgur extends JavaServer implements Image {
 
     @Override
     public Result<String> createImage(String userId, byte[] imageContents, String password) throws IOException, ExecutionException, InterruptedException {
+
+        System.out.println("Arcadia1");
         Result<User> owner = getUsersClient().getUser(userId, password);
 
         if (!owner.isOK())
             return Result.error(owner.error());
 
+        System.out.println("Arcadia2");
         String id = null;
 
         if(albumId == null) {
@@ -73,6 +77,7 @@ public class JavaImgur extends JavaServer implements Image {
 
         // Se não existir, criar o álbum
         if (albumId == null) {
+            System.out.println("Arcadia4");
             OAuthRequest createAlbumReq = new OAuthRequest(Verb.POST, CREATE_ALBUM_URL);
             createAlbumReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
             createAlbumReq.setPayload(json.toJson(new CreateAlbumArguments(albumName, albumName)));
@@ -86,6 +91,8 @@ public class JavaImgur extends JavaServer implements Image {
             BasicResponse albumResp = json.fromJson(createAlbumResp.getBody(), BasicResponse.class);
             albumId = albumResp.getData().get("id").toString();
         }
+
+        System.out.println("Arcadia5");
 
         // 2. Fazer upload da imagem
         ImageUploadArguments uploadArgs = new ImageUploadArguments(imageContents, "imageTitle" );
@@ -120,14 +127,30 @@ public class JavaImgur extends JavaServer implements Image {
         OAuthRequest albumReq = new OAuthRequest(Verb.GET, request);
         albumReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
         service.signRequest(accessToken, albumReq);
-        Response albumResp = service.execute(albumReq);
+        Response imageResp = service.execute(albumReq);
 
-        if(albumResp.getCode() != HTTP_SUCCESS){
+        if(imageResp.getCode() == HTTP_NOT_FOUND){
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+        }else if(imageResp.getCode() != HTTP_SUCCESS)
+            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
+
+        BasicResponse response = json.fromJson(imageResp.getBody(), BasicResponse.class);
+        String imageUrl = response.getData().get("link").toString();
+
+        java.net.URL url = new java.net.URL(imageUrl);
+        try (java.io.InputStream in = url.openStream();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+
+            return Result.ok(out.toByteArray());
+        } catch (IOException e) {
             return Result.error(Result.ErrorCode.INTERNAL_ERROR);
         }
-
-
-        return null;
     }
 
     @Override
@@ -141,20 +164,19 @@ public class JavaImgur extends JavaServer implements Image {
 
     //checka se o album já tá no imgur
     private void checkAlbum() throws IOException, ExecutionException, InterruptedException {
+        OAuthRequest listAlbumsRequest = new OAuthRequest(Verb.GET, "https://api.imgur.com/3/account/me/albums/");
+        service.signRequest(accessToken, listAlbumsRequest);
+        Response listAlbumsResponse = service.execute(listAlbumsRequest);
 
-            OAuthRequest listAlbumsRequest = new OAuthRequest(Verb.GET, "https://api.imgur.com/3/account/me/albums/");
-            service.signRequest(accessToken, listAlbumsRequest);
-            Response listAlbumsResponse = service.execute(listAlbumsRequest);
-
-            if (listAlbumsResponse.getCode() == HTTP_SUCCESS) {
-                AlbumListResponse albums = json.fromJson(listAlbumsResponse.getBody(), AlbumListResponse.class);
-                for (Album album : albums.getData()) {
-                    if (albumName.equals(album.getTitle())) {
-                        albumId = album.getId();
-                        break;
-                    }
+        if (listAlbumsResponse.getCode() == HTTP_SUCCESS) {
+            AlbumListResponse albums = json.fromJson(listAlbumsResponse.getBody(), AlbumListResponse.class);
+            for (Album album : albums.getData()) {
+                if (albumName.equals(album.getTitle())) {
+                    albumId = album.getId();
+                    break;
                 }
             }
+        }
     }
 
 }
