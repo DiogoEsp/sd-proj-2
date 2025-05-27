@@ -60,7 +60,12 @@ public class ImgurResource extends RestResource implements RestImage {
 
     @Override
     public void deleteImage(String userId, String imageId, String password) {
-        Result<Void> res = impl.deleteImage(userId, imageId, password);
+        Result<Void> res;
+        try {
+            res = impl.deleteImage(userId, imageId, password);
+        }catch (IOException | ExecutionException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         if (res.isOK())
             return;

@@ -8,6 +8,7 @@ import com.google.gson.Gson;
 import fctreddit.api.User;
 import fctreddit.api.imgur.data.BasicResponse;
 import fctreddit.api.imgur.data.CreateAlbumArguments;
+import fctreddit.api.imgur.data.ImageDeleteArguments;
 import fctreddit.api.imgur.data.ImageUploadArguments;
 import fctreddit.api.java.Image;
 import fctreddit.api.java.Result;
@@ -30,10 +31,12 @@ public class JavaImgur extends JavaServer implements Image {
     private static final String ADD_IMAGE_TO_ALBUM_URL = "https://api.imgur.com/3/album/{{albumHash}}/add";
     private static final String GET_ALBUM_URL = "https://api.imgur.com/3/album/{{albumHash}}";
     private static final String GET_IMAGE_URL = "https://api.imgur.com/3/image/{{imageId}}";
+    private static final String DELETE_IMAGE_URL = "https://api.imgur.com/3/image/{{imageDeleteHash}}";
     private static final int HTTP_SUCCESS = 200;
     private static final int HTTP_NOT_FOUND = 404;
     private static final String CONTENT_TYPE_HDR = "Content-Type";
     private static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
+    private static final String APPLICATION_CONTENT_TYPE = "application/x-www-form-urlencoded";
     private final Gson json;
     private final OAuth20Service service;
     private final OAuth2AccessToken accessToken;
@@ -69,7 +72,6 @@ public class JavaImgur extends JavaServer implements Image {
             return Result.error(owner.error());
 
         System.out.println("Arcadia2");
-        String id = null;
 
         if(albumId == null) {
             checkAlbum();
@@ -153,9 +155,38 @@ public class JavaImgur extends JavaServer implements Image {
         }
     }
 
+
     @Override
-    public Result<Void> deleteImage(String userId, String imageId, String password) {
-        return null;
+    public Result<Void> deleteImage(String userId, String imageId, String password) throws IOException, ExecutionException, InterruptedException {
+
+        Result<User> owner = getUsersClient().getUser(userId, password);
+
+        if (!owner.isOK())
+            return Result.error(owner.error());
+
+
+        String delete = DELETE_IMAGE_URL.replaceAll("\\{\\{imageDeleteHash\\}\\}", imageId);
+        OAuthRequest deleteReq = new OAuthRequest(Verb.DELETE, delete);
+
+        deleteReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
+
+        service.signRequest(accessToken, deleteReq);
+        Response deleteResp = service.execute(deleteReq);
+
+        System.out.println("DELETE STATUS CODE: " + deleteResp.getCode());
+        System.out.println("DELETE RESPONSE BODY: " + deleteResp.getBody());
+
+        if(deleteResp.getCode() == HTTP_NOT_FOUND)
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+        else {
+            if (deleteResp.getCode() != HTTP_SUCCESS) {
+                System.out.println("Arcadia90");
+                return Result.error(Result.ErrorCode.INTERNAL_ERROR);
+            }
+        }
+
+        return Result.ok();
+
     }
 
     public static void setHostName(String hostName){

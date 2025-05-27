@@ -78,8 +78,13 @@ public class GrpcImageServerStub extends GrpcStub implements ImageGrpc.AsyncServ
 
 	@Override
 	public void deleteImage(DeleteImageArgs request, StreamObserver<DeleteImageResult> responseObserver) {
-		Result<Void> res = impl.deleteImage(request.getUserId(), request.getImageId(), request.getPassword());
-		
+		Result<Void> res;
+		try {
+			res = impl.deleteImage(request.getUserId(), request.getImageId(), request.getPassword());
+		}catch (IOException | ExecutionException | InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+
 		if(! res.isOK() ) 
 			responseObserver.onError(errorCodeToStatus(res.error()));
 		else {

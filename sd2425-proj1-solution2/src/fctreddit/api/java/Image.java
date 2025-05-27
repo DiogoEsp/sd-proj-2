@@ -34,7 +34,7 @@ public interface Image {
 	 * 			FORBIDDEN if user password is incorrect
 	 * 		   	BAD_REQUEST password is null
 	 */
-	Result<Void> deleteImage(String userId, String imageId, String password);
+	Result<Void> deleteImage(String userId, String imageId, String password) throws IOException, ExecutionException, InterruptedException;
 	
 	
 	
