@@ -43,6 +43,9 @@ public class ImgurServer{
             Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
             JavaImgur.setDiscovery(d);
             JavaImgur.setHostName(hostname);
+            JavaImgur imgurService = new JavaImgur();
+            if(Boolean.parseBoolean(args[0]))
+                imgurService.reboot();
             d.start();
 
             //More code can be executed here...

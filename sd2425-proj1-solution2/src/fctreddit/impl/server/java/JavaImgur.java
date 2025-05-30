@@ -6,10 +6,7 @@ import com.github.scribejava.core.model.OAuth2AccessToken;
 import com.github.scribejava.core.oauth.OAuth20Service;
 import com.google.gson.Gson;
 import fctreddit.api.User;
-import fctreddit.api.imgur.data.BasicResponse;
-import fctreddit.api.imgur.data.CreateAlbumArguments;
-import fctreddit.api.imgur.data.ImageDeleteArguments;
-import fctreddit.api.imgur.data.ImageUploadArguments;
+import fctreddit.api.imgur.data.*;
 import fctreddit.api.java.Image;
 import fctreddit.api.java.Result;
 import java.io.IOException;
@@ -30,6 +27,7 @@ public class JavaImgur extends JavaServer implements Image {
     private static final String UPLOAD_IMAGE_URL = "https://api.imgur.com/3/image";
     private static final String ADD_IMAGE_TO_ALBUM_URL = "https://api.imgur.com/3/album/{{albumHash}}/add";
     private static final String GET_ALBUM_URL = "https://api.imgur.com/3/album/{{albumHash}}";
+    private static final String GET_ALBUM_IMAGES_URL = "https://api.imgur.com/3/album/{{albumHash}}/images";
     private static final String GET_IMAGE_URL = "https://api.imgur.com/3/image/{{imageId}}";
     private static final String DELETE_IMAGE_URL = "https://api.imgur.com/3/image/{{imageDeleteHash}}";
     private static final int HTTP_SUCCESS = 200;
@@ -111,7 +109,26 @@ public class JavaImgur extends JavaServer implements Image {
         BasicResponse uploadResponse = json.fromJson(uploadResp.getBody(), BasicResponse.class);
         String imageId = uploadResponse.getData().get("id").toString();
 
-        // 3. Retornar o ID da imagem
+        //3. Adicionar imagem ao album
+        System.out.println("adding1");
+        String request = ADD_IMAGE_TO_ALBUM_URL.replaceAll("\\{\\{albumHash\\}\\}", albumId);
+        System.out.println("adding2");
+        OAuthRequest addImageReq = new OAuthRequest(Verb.POST, request);
+        System.out.println("adding3");
+        addImageReq.addHeader(CONTENT_TYPE_HDR,JSON_CONTENT_TYPE);
+        System.out.println("adding4");
+        addImageReq.setPayload(json.toJson(new AddImagesToAlbumArguments(imageId)));
+        System.out.println("adding5");
+        service.signRequest(accessToken, addImageReq);
+        System.out.println("adding6");
+        Response addImageResp = service.execute(addImageReq);
+        System.out.println("adding7");
+
+        if (addImageResp.getCode() != HTTP_SUCCESS) {
+            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
+        }
+
+        // 4. Retornar o ID da imagem
         return Result.ok(imageId);
     }
 
@@ -207,6 +224,41 @@ public class JavaImgur extends JavaServer implements Image {
                     break;
                 }
             }
+        }
+    }
+
+    public void reboot() throws IOException, ExecutionException, InterruptedException {
+        checkAlbum();
+        if(albumId != null){
+            String request = GET_ALBUM_IMAGES_URL.replaceAll("\\{\\{albumHash\\}\\}", albumId);
+            OAuthRequest getAlbumImagesRequest = new OAuthRequest(Verb.GET, request);
+            service.signRequest(accessToken, getAlbumImagesRequest);
+            Response albumImagesResponse = service.execute(getAlbumImagesRequest);
+            if(albumImagesResponse.getCode() == HTTP_SUCCESS) {
+                AlbumImagesResponse imagesResponse = json.fromJson(albumImagesResponse.getBody(), AlbumImagesResponse.class);
+                List<ImgurImageFromAlbum> images = imagesResponse.getData();
+
+                if (images == null || images.isEmpty()) {
+                    System.out.println("Sem imagens no álbum.");
+                    return;
+                }
+
+                for (ImgurImageFromAlbum image : images) {
+                    String deleteHash = image.getDeletehash();
+                    if (deleteHash != null) {
+                        String deleteUrl = DELETE_IMAGE_URL.replaceAll("\\{\\{imageDeleteHash\\}\\}", deleteHash);
+                        OAuthRequest deleteReq = new OAuthRequest(Verb.DELETE, deleteUrl);
+                        deleteReq.addHeader(CONTENT_TYPE_HDR, JSON_CONTENT_TYPE);
+                        service.signRequest(accessToken, deleteReq);
+                        Response deleteResp = service.execute(deleteReq);
+
+                        System.out.println("Deleted image: " + image.getId() + " → Status: " + deleteResp.getCode());
+                    }
+                }
+            }
+
+        } else {
+            System.out.println("Álbum não existe.");
         }
     }
 
