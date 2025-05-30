@@ -1,11 +1,9 @@
 package fctreddit.impl.server.java;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.logging.Logger;
 
+import com.google.gson.Gson;
 import fctreddit.api.Post;
 import fctreddit.api.PostVote;
 import fctreddit.api.User;
@@ -15,6 +13,7 @@ import fctreddit.api.java.Result.ErrorCode;
 import fctreddit.api.java.Users;
 import fctreddit.api.rest.RestContent;
 import fctreddit.impl.client.UsersClient;
+import fctreddit.impl.kafka.KafkaPublisher;
 import fctreddit.impl.server.Hibernate;
 import fctreddit.impl.server.Hibernate.TX;
 import jakarta.ws.rs.WebApplicationException;
@@ -23,16 +22,22 @@ import jakarta.ws.rs.core.Response.Status;
 public class JavaContent extends JavaServer implements Content {
 
 	private static Logger Log = Logger.getLogger(JavaContent.class.getName());
-
+	private static final Gson gson = new Gson();
 	private Hibernate hibernate;
 
 	private static final HashMap<String, String> postLocks = new HashMap<String, String>();
 
 	private static String serverURI;
+	private static KafkaPublisher publisher;
 
 	public JavaContent() {
 		hibernate = Hibernate.getInstance();
 
+	}
+
+	public static void setKafka(KafkaPublisher publisher) {
+		if (JavaContent.publisher == null)
+			JavaContent.publisher = publisher;
 	}
 
 	public static void setServerURI(String serverURI) {
@@ -50,11 +55,7 @@ public class JavaContent extends JavaServer implements Content {
 
 		if (userPassword == null)
 			return Result.error(ErrorCode.FORBIDDEN);
-
-		System.out.println("arcadia 0");
 		Users uc = getUsersClient();
-
-		System.out.println("arcadia 1");
 
 		Log.info("Using Users client: " + uc.getClass().getCanonicalName());
 		Log.info("Users server uri: " + ((UsersClient) uc).getServerURI());
@@ -63,10 +64,8 @@ public class JavaContent extends JavaServer implements Content {
 			Log.info("Could not retrieve user information for: " + post.getAuthorId() + " -> " + owner.toString());
 			return Result.error(owner.error());
 		}
-		System.out.println("arcadia 2");
 		TX tx = hibernate.beginTransaction();
 
-		System.out.println("arcadia 3");
 		if (post.getParentUrl() != null && !post.getParentUrl().isBlank()) {
 			String postID = extractResourceID(post.getParentUrl());
 			Log.info("Trying to check if parent post exists: " + postID);
@@ -83,7 +82,6 @@ public class JavaContent extends JavaServer implements Content {
 
 		Log.info("Trying to store post");
 
-		System.out.println("arcadia 4");
 		while (true) {
 			post.setPostId(UUID.randomUUID().toString());
 			try {
@@ -111,6 +109,17 @@ public class JavaContent extends JavaServer implements Content {
 			break;
 		}
 
+		System.out.println("aqui 1");
+		if (post.getMediaUrl() != null && !post.getMediaUrl().isBlank()) {
+			Map<String, String> newEvent = new HashMap<>();
+			newEvent.put("postId", post.getPostId());
+			newEvent.put("mediaUrl", post.getMediaUrl());
+
+			publisher.publish("posts", gson.toJson(newEvent));
+		}
+
+		System.out.println("aqui 2");
+
 		try {
 			// To unlock waiting threads
 			synchronized (JavaContent.postLocks) {
@@ -129,6 +138,7 @@ public class JavaContent extends JavaServer implements Content {
 			Log.info("Ubale to notify potentiallly waiting threads due to: " + e.getMessage());
 			e.printStackTrace();
 		}
+
 
 		return Result.ok(post.getPostId());
 	}

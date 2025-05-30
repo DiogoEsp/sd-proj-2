@@ -4,6 +4,8 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.util.logging.Logger;
 
+import fctreddit.impl.kafka.KafkaPublisher;
+import fctreddit.impl.kafka.KafkaUtils;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 
@@ -24,7 +26,7 @@ public class ContentServer {
 	public static final int PORT = 8080;
 	public static final String SERVICE = "Content";
 	private static final String SERVER_URI_FMT = "https://%s:%s/rest";
-	
+
 	public static void main(String[] args) {
 		try {
 			
@@ -43,8 +45,13 @@ public class ContentServer {
 			Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
 			JavaContent.setDiscovery(d);
 			d.start();
-		
-		//More code can be executed here...
+
+			KafkaUtils.createTopic("posts");
+
+			KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+			JavaContent.setKafka(pub);
+			Log.info("crio bem");
+
 		} catch( Exception e) {
 			Log.severe(e.getMessage());
 		}

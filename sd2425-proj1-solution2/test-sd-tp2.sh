@@ -14,4 +14,3 @@ fi
 docker pull smduarte/sd2425testerbase
 docker pull smduarte/sd2425-tester-tp2
 docker run --rm --name=tester --network=sdnet -it -v /var/run/docker.sock:/var/run/docker.sock smduarte/sd2425-tester-tp2:latest $*
-
