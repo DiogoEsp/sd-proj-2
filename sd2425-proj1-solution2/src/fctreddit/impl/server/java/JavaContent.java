@@ -109,16 +109,10 @@ public class JavaContent extends JavaServer implements Content {
 			break;
 		}
 
-		System.out.println("aqui 1");
 		if (post.getMediaUrl() != null && !post.getMediaUrl().isBlank()) {
-			Map<String, String> newEvent = new HashMap<>();
-			newEvent.put("postId", post.getPostId());
-			newEvent.put("mediaUrl", post.getMediaUrl());
-
-			publisher.publish("posts", gson.toJson(newEvent));
+			String stringBuilt = "create " + post.getMediaUrl();
+			publisher.publish("posts", stringBuilt);
 		}
-
-		System.out.println("aqui 2");
 
 		try {
 			// To unlock waiting threads
@@ -374,6 +368,8 @@ public class JavaContent extends JavaServer implements Content {
 							+ p.getAuthorId() + ": " + res.error().toString());
 				}
 			}
+			String stringBuilt = "delete " + p.getMediaUrl();
+			publisher.publish("posts", stringBuilt);
 			hibernate.commitTransaction(tx);
 		} catch (Exception e) {
 			e.printStackTrace();
