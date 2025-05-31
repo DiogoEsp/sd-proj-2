@@ -5,6 +5,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.logging.Logger;
 
+import fctreddit.impl.kafka.KafkaPublisher;
 import fctreddit.impl.kafka.KafkaSubscriber;
 import fctreddit.impl.kafka.KafkaUtils;
 import fctreddit.impl.kafka.RecordProcessor;
@@ -77,8 +78,15 @@ public class ImageServer {
                 }
             });
             JavaImage.handleImageDeletion();
+
+            KafkaUtils.createTopic("image");
+            KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+            JavaImage.setKafka(pub);
+
         } catch (Exception e) {
             Log.severe(e.getMessage());
         }
+
+
     }
 }

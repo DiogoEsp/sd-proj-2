@@ -14,6 +14,7 @@ import fctreddit.api.User;
 import fctreddit.api.java.Image;
 import fctreddit.api.java.Result;
 import fctreddit.api.java.Result.ErrorCode;
+import fctreddit.impl.kafka.KafkaPublisher;
 
 public class JavaImage extends JavaServer implements Image {
 
@@ -24,6 +25,7 @@ public class JavaImage extends JavaServer implements Image {
 
     private static final Map<String, Integer> refCount = new ConcurrentHashMap<>();
     private static final Map<String, Long> createdAt = new ConcurrentHashMap<>();
+    private static KafkaPublisher publisher;
 
     public JavaImage() {
         File f = baseDirectory.toFile();
@@ -31,6 +33,11 @@ public class JavaImage extends JavaServer implements Image {
         if (!f.exists()) {
             f.mkdirs();
         }
+    }
+
+    public static void setKafka(KafkaPublisher publisher) {
+        if (JavaImage.publisher == null)
+            JavaImage.publisher = publisher;
     }
 
     public static void incrementRef(String imageId, boolean isCreate) {
@@ -133,6 +140,7 @@ public class JavaImage extends JavaServer implements Image {
         synchronized (this) {
             if (iFile.exists() && iFile.isFile()) {
                 iFile.delete();
+                publisher.publish("images", imageId);
                 return Result.ok();
             } else {
                 return Result.error(ErrorCode.NOT_FOUND);

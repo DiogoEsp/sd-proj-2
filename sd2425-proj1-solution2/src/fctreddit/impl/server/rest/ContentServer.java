@@ -2,10 +2,14 @@ package fctreddit.impl.server.rest;
 
 import java.net.InetAddress;
 import java.net.URI;
+import java.util.List;
 import java.util.logging.Logger;
 
 import fctreddit.impl.kafka.KafkaPublisher;
+import fctreddit.impl.kafka.KafkaSubscriber;
 import fctreddit.impl.kafka.KafkaUtils;
+import fctreddit.impl.kafka.RecordProcessor;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 
@@ -51,6 +55,22 @@ public class ContentServer {
 			KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
 			JavaContent.setKafka(pub);
 			Log.info("crio bem");
+
+
+			KafkaUtils.createTopic("images");
+			KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
+
+			sub.start(new RecordProcessor() {
+				@Override
+				public void onReceive(ConsumerRecord<String, String> r) {
+					try{
+						String value = r.toString();
+						JavaContent.handleDeletedImages(value);
+					}catch(Exception e){
+						System.out.println("Error: " + e.getMessage());
+					}
+				}
+			});
 
 		} catch( Exception e) {
 			Log.severe(e.getMessage());

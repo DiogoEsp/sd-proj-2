@@ -18,6 +18,7 @@ import fctreddit.impl.server.Hibernate;
 import fctreddit.impl.server.Hibernate.TX;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 public class JavaContent extends JavaServer implements Content {
 
@@ -43,6 +44,26 @@ public class JavaContent extends JavaServer implements Content {
 	public static void setServerURI(String serverURI) {
 		if (JavaContent.serverURI == null)
 			JavaContent.serverURI = serverURI;
+	}
+
+	public static void handleDeletedImages(String value) {
+		Log.info("Received image deletion message: " + value);
+		// Supondo que o value seja o ID da imagem a eliminar
+		String imageId = value.trim();
+		if (imageId.isEmpty()) {
+			Log.warning("Empty image ID received for deletion.");
+			return;
+		}
+		try {
+			// Aqui, implementa o código para remover referências ou dados relacionados a essa imagem
+			// Exemplo simples: apagar da base de dados (pseudocódigo)
+			TX tx = Hibernate.getInstance().beginTransaction();
+			int deleted = Hibernate.getInstance().sql(tx, "DELETE FROM Image WHERE imageId = '" + imageId + "'");
+			Hibernate.getInstance().commitTransaction(tx);
+			Log.info("Deleted image with ID: " + imageId + ", affected rows: " + deleted);
+		} catch (Exception e) {
+			Log.severe("Failed to delete image with ID: " + imageId + " due to: " + e.getMessage());
+		}
 	}
 
 	@Override
