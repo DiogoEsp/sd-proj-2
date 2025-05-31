@@ -22,7 +22,17 @@ public class JavaImage extends JavaServer implements Image {
     private static Logger Log = Logger.getLogger(JavaImage.class.getName());
 
     private static final Path baseDirectory = Path.of("home", "sd", "images");
+    private static final String baseUrl;
 
+    static {
+        String hostname = "localhost"; // fallback
+        try {
+            hostname = java.net.InetAddress.getLocalHost().getHostName();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        baseUrl = "https://" + hostname + ":8080/rest/image/";
+    }
     private static final Map<String, Integer> refCount = new ConcurrentHashMap<>();
     private static final Map<String, Long> createdAt = new ConcurrentHashMap<>();
     private static KafkaPublisher publisher;
@@ -140,7 +150,8 @@ public class JavaImage extends JavaServer implements Image {
         synchronized (this) {
             if (iFile.exists() && iFile.isFile()) {
                 iFile.delete();
-                publisher.publish("images", imageId);
+                String url = baseUrl  + userId + "/" + imageId;
+                publisher.publish("images", url);
                 return Result.ok();
             } else {
                 return Result.error(ErrorCode.NOT_FOUND);
@@ -152,7 +163,7 @@ public class JavaImage extends JavaServer implements Image {
         new Thread(() -> {
             while (true) {
                 try {
-                    Thread.sleep(15000);
+                    Thread.sleep(10000);
                     Long now = System.currentTimeMillis();
                     System.out.println("estou de facto aqui ola!!!!!!");
                     for (String id : new HashSet<>(createdAt.keySet())) {
@@ -170,7 +181,7 @@ public class JavaImage extends JavaServer implements Image {
                             Path image = Path.of(baseDirectory.toString(), userId, imageId);
                             File iFile = image.toFile();
                             System.out.println("Vou tentar apagar o ficheiro: " + image);
-                            System.out.println("Existe? " + iFile.exists() + ", É ficheiro? " + iFile.isFile());
+                            System.out.println(image + "Existe? " + iFile.exists() + ", É ficheiro? " + iFile.isFile());
                             synchronized (JavaImage.class) {
                                 if (iFile.exists() && iFile.isFile()) {
                                     iFile.delete();

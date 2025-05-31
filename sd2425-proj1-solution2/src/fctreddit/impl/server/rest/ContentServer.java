@@ -64,7 +64,7 @@ public class ContentServer {
 				@Override
 				public void onReceive(ConsumerRecord<String, String> r) {
 					try{
-						String value = r.toString();
+						String value = r.value().toString();
 						JavaContent.handleDeletedImages(value);
 					}catch(Exception e){
 						System.out.println("Error: " + e.getMessage());

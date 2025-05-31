@@ -49,8 +49,8 @@ public class JavaContent extends JavaServer implements Content {
 	public static void handleDeletedImages(String value) {
 		Log.info("Received image deletion message: " + value);
 		// Supondo que o value seja o ID da imagem a eliminar
-		String imageId = value.trim();
-		if (imageId.isEmpty()) {
+		String imageUrl = value.trim();
+		if (imageUrl.isEmpty()) {
 			Log.warning("Empty image ID received for deletion.");
 			return;
 		}
@@ -58,11 +58,11 @@ public class JavaContent extends JavaServer implements Content {
 			// Aqui, implementa o código para remover referências ou dados relacionados a essa imagem
 			// Exemplo simples: apagar da base de dados (pseudocódigo)
 			TX tx = Hibernate.getInstance().beginTransaction();
-			int deleted = Hibernate.getInstance().sql(tx, "DELETE FROM Image WHERE imageId = '" + imageId + "'");
+			int deleted = Hibernate.getInstance().sql(tx, "UPDATE Post p SET p.mediaUrl=NULL where p.mediaUrl='" + imageUrl + "'");
 			Hibernate.getInstance().commitTransaction(tx);
-			Log.info("Deleted image with ID: " + imageId + ", affected rows: " + deleted);
+			Log.info("Deleted image with ID: " + imageUrl + ", affected rows: " + deleted);
 		} catch (Exception e) {
-			Log.severe("Failed to delete image with ID: " + imageId + " due to: " + e.getMessage());
+			Log.severe("Failed to delete image with ID: " + imageUrl + " due to: " + e.getMessage());
 		}
 	}
 
