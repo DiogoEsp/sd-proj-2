@@ -127,6 +127,7 @@ public class JavaImage extends JavaServer implements Image {
                     return Result.error(ErrorCode.INTERNAL_ERROR);
                 }
             } else {
+                System.out.println("imagem n encontrada");
                 return Result.error(ErrorCode.NOT_FOUND);
             }
         }
@@ -171,6 +172,8 @@ public class JavaImage extends JavaServer implements Image {
                         boolean unused = !refCount.containsKey(id);
                         boolean thirtyPassed = at != null && (now - at) >= 30000;
 
+                        System.out.println(id + " com " + refCount.get(id));
+
                         if (unused && thirtyPassed) {
                             System.out.println("estou de facto aqui 2");
                             String[] parts = id.split("/");
@@ -181,10 +184,11 @@ public class JavaImage extends JavaServer implements Image {
                             Path image = Path.of(baseDirectory.toString(), userId, imageId);
                             File iFile = image.toFile();
                             System.out.println("Vou tentar apagar o ficheiro: " + image);
-                            System.out.println(image + "Existe? " + iFile.exists() + ", É ficheiro? " + iFile.isFile());
+                            System.out.println(image + " Existe? " + iFile.exists() + ", É ficheiro? " + iFile.isFile());
                             synchronized (JavaImage.class) {
                                 if (iFile.exists() && iFile.isFile()) {
                                     iFile.delete();
+                                    System.out.println("imagem foi apagada?" + iFile.exists());
                                 }
                             }
                         }

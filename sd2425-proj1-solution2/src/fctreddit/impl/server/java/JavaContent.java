@@ -383,15 +383,16 @@ public class JavaContent extends JavaServer implements Content {
 			}
 			if (p.getMediaUrl() != null) {
 				String imageId = extractResourceID(p.getMediaUrl());
-				Result<Void> res = getImageClient().deleteImage(p.getAuthorId(), imageId, userPassword);
+				/**Result<Void> res = getImageClient().deleteImage(p.getAuthorId(), imageId, userPassword);
 				if (!res.isOK()) {
 					Log.info("Failed to delete image of post " + postId + " that has id: " + imageId + " and owner "
 							+ p.getAuthorId() + ": " + res.error().toString());
-				}
+				}*/
+
+				String stringBuilt = "delete " + p.getMediaUrl();
+				publisher.publish("posts", stringBuilt);
+				hibernate.commitTransaction(tx);
 			}
-			String stringBuilt = "delete " + p.getMediaUrl();
-			publisher.publish("posts", stringBuilt);
-			hibernate.commitTransaction(tx);
 		} catch (Exception e) {
 			e.printStackTrace();
 			hibernate.abortTransaction(tx);
