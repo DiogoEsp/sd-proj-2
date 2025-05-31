@@ -316,8 +316,14 @@ public class JavaContent extends JavaServer implements Content {
 		// We can update finally
 		if (post.getContent() != null)
 			p.setContent(post.getContent());
-		if (post.getMediaUrl() != null)
+		if (post.getMediaUrl() != null) {
+			String stringBuilt = "delete " + p.getMediaUrl();
+			publisher.publish("posts", stringBuilt);
 			p.setMediaUrl(post.getMediaUrl());
+			stringBuilt = "create " + p.getMediaUrl();
+			publisher.publish("posts", stringBuilt);
+		}
+
 
 		try {
 			hibernate.persist(tx, p);
@@ -383,12 +389,6 @@ public class JavaContent extends JavaServer implements Content {
 			}
 			if (p.getMediaUrl() != null) {
 				String imageId = extractResourceID(p.getMediaUrl());
-				/**Result<Void> res = getImageClient().deleteImage(p.getAuthorId(), imageId, userPassword);
-				if (!res.isOK()) {
-					Log.info("Failed to delete image of post " + postId + " that has id: " + imageId + " and owner "
-							+ p.getAuthorId() + ": " + res.error().toString());
-				}*/
-
 				String stringBuilt = "delete " + p.getMediaUrl();
 				publisher.publish("posts", stringBuilt);
 				hibernate.commitTransaction(tx);

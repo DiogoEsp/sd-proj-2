@@ -188,7 +188,8 @@ public class JavaImage extends JavaServer implements Image {
                             synchronized (JavaImage.class) {
                                 if (iFile.exists() && iFile.isFile()) {
                                     iFile.delete();
-                                    System.out.println("imagem foi apagada?" + iFile.exists());
+                                    createdAt.remove(id); // limpar para evitar duplicação futura
+                                    System.out.println("imagem foi apagada? " + !iFile.exists());
                                 }
                             }
                         }
