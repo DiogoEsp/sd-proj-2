@@ -144,7 +144,7 @@ public class JavaImage extends JavaServer implements Image {
         new Thread(() -> {
             while (true) {
                 try {
-                    Thread.sleep(30000);
+                    Thread.sleep(15000);
                     Long now = System.currentTimeMillis();
                     System.out.println("estou de facto aqui ola!!!!!!");
                     for (String id : new HashSet<>(createdAt.keySet())) {
@@ -163,9 +163,10 @@ public class JavaImage extends JavaServer implements Image {
                             File iFile = image.toFile();
                             System.out.println("Vou tentar apagar o ficheiro: " + image);
                             System.out.println("Existe? " + iFile.exists() + ", É ficheiro? " + iFile.isFile());
-                            if (iFile.exists() && iFile.isFile()) {
-                                iFile.delete();
-                                System.out.println("apaguei ya");
+                            synchronized (JavaImage.class) {
+                                if (iFile.exists() && iFile.isFile()) {
+                                    iFile.delete();
+                                }
                             }
                         }
                     }

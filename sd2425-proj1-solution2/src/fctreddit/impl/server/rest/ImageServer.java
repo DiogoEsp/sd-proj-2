@@ -60,8 +60,13 @@ public class ImageServer {
                         String operation = value[0];
                         String mediaUrl = value[1];
                         String[] bMediaUrl = mediaUrl.split("/");
-                        String all = bMediaUrl[bMediaUrl.length - 2] + "/" + bMediaUrl[bMediaUrl.length - 1];
-                        System.out.println("Formatted Version: " + all);
+                        // remove extensão se existir (fica só o UUID)
+                        int dot = bMediaUrl[bMediaUrl.length - 1].indexOf('.');
+                        String cleanImageId = (dot == -1) ? bMediaUrl[bMediaUrl.length - 1]
+                                : bMediaUrl[bMediaUrl.length - 1].substring(0, dot);
+                        String all = bMediaUrl[bMediaUrl.length - 2] + "/" + cleanImageId;
+
+                        System.out.println("Formatted Version: " + operation + " " + all);
                         switch (operation) {
                             case "create" -> JavaImage.incrementRef(all, true);
                             case "delete" -> JavaImage.incrementRef(all, false);
