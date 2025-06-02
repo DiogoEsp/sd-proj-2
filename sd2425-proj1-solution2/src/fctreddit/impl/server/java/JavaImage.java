@@ -45,9 +45,13 @@ public class JavaImage extends JavaServer implements Image {
         }
     }
 
-    public static void setKafka(KafkaPublisher publisher) {
-        if (JavaImage.publisher == null)
-            JavaImage.publisher = publisher;
+    public static void setKafka(KafkaPublisher p) {
+        if (JavaImage.publisher == null) {
+            JavaImage.publisher = p;
+            Log.info("Kafka publisher has been set.");
+        } else {
+            Log.warning("Kafka publisher already set, ignoring reinitialization.");
+        }
     }
 
     public static void incrementRef(String imageId, boolean isCreate) {
@@ -152,7 +156,12 @@ public class JavaImage extends JavaServer implements Image {
             if (iFile.exists() && iFile.isFile()) {
                 iFile.delete();
                 String url = baseUrl  + userId + "/" + imageId;
-                publisher.publish("images", url);
+                if (publisher != null) {
+                    publisher.publish("images", url); // also fix topic name if needed
+                } else {
+                    Log.severe("Kafka publisher is null in deleteImage!");
+                }
+
                 return Result.ok();
             } else {
                 return Result.error(ErrorCode.NOT_FOUND);

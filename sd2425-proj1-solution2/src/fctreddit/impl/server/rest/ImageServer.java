@@ -79,7 +79,7 @@ public class ImageServer {
             });
             JavaImage.handleImageDeletion();
 
-            KafkaUtils.createTopic("image");
+            KafkaUtils.createTopic("images");
             KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
             JavaImage.setKafka(pub);
 

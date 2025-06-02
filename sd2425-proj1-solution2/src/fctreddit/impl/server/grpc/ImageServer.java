@@ -3,8 +3,13 @@ package fctreddit.impl.server.grpc;
 import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.security.KeyStore;
+import java.util.List;
 import java.util.logging.Logger;
 
+import fctreddit.impl.kafka.KafkaPublisher;
+import fctreddit.impl.kafka.KafkaSubscriber;
+import fctreddit.impl.kafka.KafkaUtils;
+import fctreddit.impl.kafka.RecordProcessor;
 import fctreddit.impl.server.Discovery;
 import fctreddit.impl.server.java.JavaImage;
 import io.grpc.Grpc;
@@ -15,6 +20,7 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import javax.net.ssl.KeyManagerFactory;
 
@@ -53,6 +59,37 @@ public class ImageServer {
         Discovery discovery = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
         discovery.start();
         JavaImage.setDiscovery(discovery);
+        KafkaUtils.createTopic("posts");
+        KafkaSubscriber subscriber = KafkaSubscriber.createSubscriber("kafka:9092", List.of("posts"));
+        subscriber.start(new RecordProcessor() {
+            @Override
+            public void onReceive(ConsumerRecord<String, String> r) {
+                try {
+                    String[] value = r.value().split(" ");
+                    String operation = value[0];
+                    String mediaUrl = value[1];
+                    String[] bMediaUrl = mediaUrl.split("/");
+                    int dot = bMediaUrl[bMediaUrl.length - 1].indexOf('.');
+                    String cleanImageId = (dot == -1) ? bMediaUrl[bMediaUrl.length - 1]
+                            : bMediaUrl[bMediaUrl.length - 1].substring(0, dot);
+                    String all = bMediaUrl[bMediaUrl.length - 2] + "/" + cleanImageId;
+
+                    System.out.println("Formatted Version: " + operation + " " + all);
+                    switch (operation) {
+                        case "create" -> JavaImage.incrementRef(all, true);
+                        case "delete" -> JavaImage.incrementRef(all, false);
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error in Kafka processor: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        });
+        JavaImage.handleImageDeletion();
+
+        KafkaUtils.createTopic("images");
+        KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+        JavaImage.setKafka(pub);
 
         Log.info(String.format("Image gRPC Server ready @ %s\n", serverURI));
         server.start().awaitTermination();

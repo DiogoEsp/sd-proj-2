@@ -3,8 +3,13 @@ package fctreddit.impl.server.grpc;
 import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.security.KeyStore;
+import java.util.List;
 import java.util.logging.Logger;
 
+import fctreddit.impl.kafka.KafkaPublisher;
+import fctreddit.impl.kafka.KafkaSubscriber;
+import fctreddit.impl.kafka.KafkaUtils;
+import fctreddit.impl.kafka.RecordProcessor;
 import fctreddit.impl.server.Discovery;
 import fctreddit.impl.server.java.JavaContent;
 import io.grpc.Grpc;
@@ -15,6 +20,7 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import javax.net.ssl.KeyManagerFactory;
 
@@ -53,6 +59,28 @@ public class ContentServer {
         Discovery discovery = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
         discovery.start();
         JavaContent.setDiscovery(discovery);
+
+        KafkaUtils.createTopic("posts");
+
+        KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+        JavaContent.setKafka(pub);
+        Log.info("crio bem");
+
+
+        KafkaUtils.createTopic("images");
+        KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
+
+        sub.start(new RecordProcessor() {
+            @Override
+            public void onReceive(ConsumerRecord<String, String> r) {
+                try{
+                    String value = r.value().toString();
+                    JavaContent.handleDeletedImages(value);
+                }catch(Exception e){
+                    System.out.println("Error: " + e.getMessage());
+                }
+            }
+        });
 
         Log.info(String.format("Image gRPC Server ready @ %s\n", serverURI));
         server.start().awaitTermination();

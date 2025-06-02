@@ -368,8 +368,16 @@ public class JavaContent extends JavaServer implements Content {
 			List<String> descendants = hibernate.sql(tx,
 					"SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
 					String.class);
-			for (String id : descendants)
-				pending.addLast(hibernate.get(tx, Post.class, id));
+			for (String id : descendants){
+					Log.info("Fetching descendant post with ID: " + id);
+					Post child = hibernate.get(tx, Post.class, id);
+					if (child == null) {
+						Log.warning("Child post with ID " + id + " not found!");
+						continue;
+					}
+					pending.addLast(child);
+			}
+
 			allElementsToDelete.addFirst(current);
 		}
 
@@ -380,19 +388,23 @@ public class JavaContent extends JavaServer implements Content {
 				hibernate.delete(tx, d);
 				synchronized (JavaContent.postLocks) {
 					String s = JavaContent.postLocks.remove(d.getPostId());
-					if(s!= null) {
+					if (s != null) {
 						synchronized (s) {
 							s.notifyAll();
 						}
 					}
 				}
+
+				if (d.getMediaUrl() != null) {
+					String imageId = extractResourceID(d.getMediaUrl());
+					String stringBuilt = "delete " + d.getMediaUrl();
+					publisher.publish("posts", stringBuilt);
+
+				}
 			}
-			if (p.getMediaUrl() != null) {
-				String imageId = extractResourceID(p.getMediaUrl());
-				String stringBuilt = "delete " + p.getMediaUrl();
-				publisher.publish("posts", stringBuilt);
+			if(p.getMediaUrl() != null)
 				hibernate.commitTransaction(tx);
-			}
+
 		} catch (Exception e) {
 			e.printStackTrace();
 			hibernate.abortTransaction(tx);
