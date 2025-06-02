@@ -29,6 +29,8 @@ public interface RestContent {
 	public static final String TIMEOUT = "timeout";
 	
 	public static final String CLEAR = "clear";
+
+
 	
 	/**
 	 * The following constants are the values that can be sent for the query parameter SORTBY

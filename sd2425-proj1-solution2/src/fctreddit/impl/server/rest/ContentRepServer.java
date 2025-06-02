@@ -1,7 +1,8 @@
 package fctreddit.impl.server.rest;
 
 import fctreddit.impl.server.Discovery;
-import fctreddit.impl.server.java.JavaContentRep;
+import fctreddit.impl.server.java.JavaContent;
+import fctreddit.impl.server.rest.filter.VersionFilter;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 
@@ -28,6 +29,7 @@ public class ContentRepServer {
             System.out.println("server");
             ResourceConfig config = new ResourceConfig();
             config.register(ContentResource.class);
+            config.register(VersionFilter.class);
 
             String hostname = InetAddress.getLocalHost().getHostName();
             String serverURI = String.format(SERVER_URI_FMT, hostname, PORT);
@@ -36,7 +38,7 @@ public class ContentRepServer {
             Log.info(String.format("%s Server ready @ %s\n",  SERVICE, serverURI));
 
             Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
-            JavaContentRep.setDiscovery(d);
+            JavaContent.setDiscovery(d);
             d.start();
 
             //More code can be executed here...
