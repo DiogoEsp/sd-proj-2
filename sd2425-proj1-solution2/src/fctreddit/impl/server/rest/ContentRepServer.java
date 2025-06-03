@@ -79,8 +79,7 @@ public class ContentRepServer {
                 @Override
                 public void onReceive(ConsumerRecord<String, String> record) {
                     try {
-                        String json = record.value();
-                        JavaContentRep.handleReplication(json);
+                        JavaContentRep.handleReplication(record);
                     } catch (Exception e) {
                         System.out.println("Error handling replication event: " + e.getMessage());
                         e.printStackTrace();

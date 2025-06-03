@@ -1,5 +1,7 @@
 package fctreddit.utils;
 
+import fctreddit.api.java.Result;
+
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SyncPoint {
@@ -21,7 +23,7 @@ public class SyncPoint {
         return SyncPoint.instance;
     }
 
-    public synchronized String waitForResult( long n ) {
+    public synchronized Result<String> waitForResult(long n ) {
         while( version < n ) {
             try {
                 wait();
@@ -30,7 +32,7 @@ public class SyncPoint {
             }
         }
 
-        return result.remove(n);
+        return Result.ok(result.remove(n));
     }
 
     public synchronized void waitForVersion( long n ) {

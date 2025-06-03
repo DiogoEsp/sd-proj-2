@@ -10,40 +10,58 @@ import fctreddit.api.User;
 import fctreddit.api.java.Content;
 import fctreddit.api.java.Result;
 import fctreddit.api.java.Result.ErrorCode;
-import fctreddit.api.java.Users;
 import fctreddit.api.rest.RestContent;
 import fctreddit.api.rest.RestContentRep;
-import fctreddit.impl.client.UsersClient;
 import fctreddit.impl.kafka.KafkaPublisher;
 import fctreddit.impl.server.Hibernate;
 import fctreddit.impl.server.Hibernate.TX;
 import fctreddit.impl.server.rest.Replication.ContentEffects;
 import fctreddit.impl.server.rest.Replication.PreCondicions;
+import fctreddit.utils.CreatePostArg;
+import fctreddit.utils.SyncPoint;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 public class JavaContentRep extends JavaServer implements Content {
+
+    private static final String REP_TOPIC = "replication";
+
+    private static final String CREATE = "CREATE";
+    private static final String GET = "GET";
 
     private static Logger Log = Logger.getLogger(JavaContentRep.class.getName());
     private static final Gson gson = new Gson();
     private Hibernate hibernate;
 
-    private static final HashMap<String, String> postLocks = new HashMap<String, String>();
+    public static final HashMap<String, String> postLocks = new HashMap<String, String>();
 
     private static String serverURI;
     private static PreCondicions pc;
     private static ContentEffects ce;
     private static KafkaPublisher publisher;
+    private static final SyncPoint syncPoint = SyncPoint.getSyncPoint();
+    private static KafkaPublisher repPublisher;
+
+    public record ReplicationMessage(
+            String operation,
+            String jsonArgs
+    ) {}
 
     public JavaContentRep() {
         hibernate = Hibernate.getInstance();
         pc = new PreCondicions(hibernate, Log);
-        ce = new ContentEffects(hibernate, Log);
+        ce = new ContentEffects(hibernate, Log, publisher, postLocks, serverURI);
     }
 
     public static void setKafka(KafkaPublisher publisher) {
         if (JavaContentRep.publisher == null)
             JavaContentRep.publisher = publisher;
+    }
+
+    public static void setKafkaRep(KafkaPublisher publisherRep) {
+        if (JavaContentRep.repPublisher == null)
+            JavaContentRep.repPublisher = publisherRep;
     }
 
     public static void setServerURI(String serverURI) {
@@ -71,8 +89,25 @@ public class JavaContentRep extends JavaServer implements Content {
         }
     }
 
-    public static void handleReplication(String value){
+    public static void handleReplication(ConsumerRecord<String, String> record){
+        long offset = record.offset(); // ← THIS is the version!
+        String json = record.value();
 
+        ReplicationMessage msg = gson.fromJson(json, ReplicationMessage.class);
+
+        switch (msg.operation()) {
+            case "CREATE" -> {
+                CreatePostArg arg = gson.fromJson(msg.jsonArgs(), CreatePostArg.class);
+                Result<String> result = ce.createPost((Post) arg.data());
+
+                if (result.isOK()) {
+                    syncPoint.setResult(offset, result.value());  // success
+                } else {
+                    syncPoint.setResult(offset, null); // or result.error() if you're tracking errors
+                }
+            }
+            // handle other ops...
+        }
     }
 
     @Override
@@ -84,77 +119,30 @@ public class JavaContentRep extends JavaServer implements Content {
             return pre;
         }
 
-        TX tx = hibernate.beginTransaction();
+        String id = UUID.randomUUID().toString();
+        post.setPostId(id);
 
-        if (post.getParentUrl() != null && !post.getParentUrl().isBlank()) {
-            String postID = extractResourceID(post.getParentUrl());
-            Log.info("Trying to check if parent post exists: " + postID);
-            Post p = hibernate.get(tx, Post.class, postID);
-            if (p == null) {
-                hibernate.abortTransaction(tx);
-                return Result.error(ErrorCode.NOT_FOUND);
-            }
+        CreatePostArg arg = new CreatePostArg(CREATE, post);
+        String jsonArgs = gson.toJson(arg);
+        ReplicationMessage msg = new ReplicationMessage(CREATE, jsonArgs);
+        String messageJson = gson.toJson(msg);
+
+// envia
+        publisher.publish("replication", CREATE, messageJson);
+        long offset = publisher.publish(REP_TOPIC, CREATE, messageJson);
+
+        var r = syncPoint.waitForResult(offset);
+        if (r == null) {
+            Log.info( "Timeout waiting for replication.");
+            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
         }
 
-        post.setCreationTimestamp(System.currentTimeMillis());
-        post.setUpVote(0);
-        post.setDownVote(0);
-
-        Log.info("Trying to store post");
-
-        while (true) {
-            post.setPostId(UUID.randomUUID().toString());
-            try {
-                hibernate.persist(tx, post);
-                hibernate.commitTransaction(tx);
-            } catch (Exception ex) { // The transaction has failed, which means we have to restart the whole
-                // transaction
-                Log.info("Failed to commit transaction creating post");
-                ex.printStackTrace();
-
-                hibernate.abortTransaction(tx);
-                Log.info("Aborting and restarting...");
-                tx = hibernate.beginTransaction();
-                if (post.getParentUrl() != null && !post.getParentUrl().isBlank()) {
-                    String postID = extractResourceID(post.getParentUrl());
-                    Log.info("Trying to check if parent post exists: " + postID);
-                    Post p = hibernate.get(tx, Post.class, postID);
-                    if (p == null) {
-                        hibernate.abortTransaction(tx);
-                        return Result.error(ErrorCode.NOT_FOUND);
-                    }
-                }
-                continue;
-            }
-            break;
+        if(r.isOK()){
+            return Result.ok(r.value());
         }
-
-        if (post.getMediaUrl() != null && !post.getMediaUrl().isBlank()) {
-            String stringBuilt = "create " + post.getMediaUrl();
-            publisher.publish("posts", stringBuilt);
+        else{
+            return Result.error(r.error());
         }
-
-        try {
-            // To unlock waiting threads
-            synchronized (JavaContentRep.postLocks) {
-                JavaContentRep.postLocks.put(post.getPostId(), post.getPostId());
-
-                if (post.getParentUrl() != null) {
-                    String parentId = extractResourceID(post.getParentUrl());
-                    String lock = JavaContentRep.postLocks.get(parentId);
-                    synchronized (lock) {
-                        lock.notifyAll();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Unable to notify due tome strange event.
-            Log.info("Ubale to notify potentiallly waiting threads due to: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-
-        return Result.ok(post.getPostId());
     }
 
     @Override
