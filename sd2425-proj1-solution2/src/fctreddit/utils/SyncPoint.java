@@ -23,7 +23,7 @@ public class SyncPoint {
         return SyncPoint.instance;
     }
 
-    public synchronized Result<String> waitForResult(long n ) {
+    public synchronized Result<Object> waitForResult(long n ) {
         while( version < n ) {
             try {
                 wait();

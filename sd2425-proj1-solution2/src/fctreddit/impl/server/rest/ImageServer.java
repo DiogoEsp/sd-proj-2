@@ -51,6 +51,7 @@ public class ImageServer {
             d.start();
 
             KafkaUtils.createTopic("posts");
+            KafkaUtils.createTopic("images");
             KafkaSubscriber subscriber = KafkaSubscriber.createSubscriber("kafka:9092", List.of("posts"));
 
             subscriber.start(new RecordProcessor() {
@@ -61,7 +62,7 @@ public class ImageServer {
                         String operation = value[0];
                         String mediaUrl = value[1];
                         String[] bMediaUrl = mediaUrl.split("/");
-                        // remove extensão se existir (fica só o UUID)
+
                         int dot = bMediaUrl[bMediaUrl.length - 1].indexOf('.');
                         String cleanImageId = (dot == -1) ? bMediaUrl[bMediaUrl.length - 1]
                                 : bMediaUrl[bMediaUrl.length - 1].substring(0, dot);
@@ -79,7 +80,6 @@ public class ImageServer {
             });
             JavaImage.handleImageDeletion();
 
-            KafkaUtils.createTopic("images");
             KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
             JavaImage.setKafka(pub);
 

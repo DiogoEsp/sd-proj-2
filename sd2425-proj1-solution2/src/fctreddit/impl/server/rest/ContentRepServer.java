@@ -6,6 +6,7 @@ import fctreddit.impl.kafka.KafkaUtils;
 import fctreddit.impl.kafka.RecordProcessor;
 import fctreddit.impl.server.Discovery;
 import fctreddit.impl.server.java.JavaContentRep;
+import fctreddit.impl.server.rest.Replication.ContentRepResource;
 import fctreddit.impl.server.rest.filter.VersionFilter;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
@@ -32,16 +33,15 @@ public class ContentRepServer {
 
     public static void main(String[] args) {
         try {
-            System.out.println("server");
             ResourceConfig config = new ResourceConfig();
-            config.register(ContentResource.class);
+            config.register(ContentRepResource.class);
             config.register(VersionFilter.class);
 
             String hostname = InetAddress.getLocalHost().getHostName();
             String serverURI = String.format(SERVER_URI_FMT, hostname, PORT);
             JdkHttpServerFactory.createHttpServer( URI.create(serverURI), config, SSLContext.getDefault());
 
-            Log.info(String.format("%s Server ready @ %s\n",  SERVICE, serverURI));
+            Log.info(String.format("%s Replication Server ready @ %s\n",  SERVICE, serverURI));
 
             Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
             JavaContentRep.setDiscovery(d);
@@ -51,8 +51,6 @@ public class ContentRepServer {
 
             KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
             JavaContentRep.setKafka(pub);
-            Log.info("crio bem");
-
 
             KafkaUtils.createTopic("images");
             KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
@@ -61,7 +59,8 @@ public class ContentRepServer {
                 @Override
                 public void onReceive(ConsumerRecord<String, String> r) {
                     try{
-                        String value = r.value().toString();
+                        Log.info("Operation deleteImages with subscriber");
+                        String value = r.value();
                         JavaContentRep.handleDeletedImages(value);
                     }catch(Exception e){
                         System.out.println("Error: " + e.getMessage());
@@ -74,11 +73,11 @@ public class ContentRepServer {
 
             KafkaSubscriber repSub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("replication"));
 
-
             repSub.start(new RecordProcessor() {
                 @Override
                 public void onReceive(ConsumerRecord<String, String> record) {
                     try {
+                        Log.info("Handling Replication!");
                         JavaContentRep.handleReplication(record);
                     } catch (Exception e) {
                         System.out.println("Error handling replication event: " + e.getMessage());

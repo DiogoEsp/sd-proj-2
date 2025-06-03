@@ -12,15 +12,16 @@ import org.hibernate.event.spi.ResolveNaturalIdEventListener;
 import java.util.logging.Logger;
 
 public class PreCondicions extends JavaContentRep {
+    private static Logger Log = Logger.getLogger(PreCondicions.class.getName());
 
     private Hibernate hibernate;
-    private Logger Log;
 
-    public PreCondicions(Hibernate hibernate, Logger Log){
+    public PreCondicions(Hibernate hibernate){
         this.hibernate = hibernate;
-        this.Log = Log;
     }
-    public Result<String> createUser(Post post, String userPassword){
+
+    public Result<String> createPost(Post post, String userPassword){
+        Log.info("Checking Pre Conditions for CreatePost");
         if (post.getAuthorId() == null || post.getAuthorId().isBlank() || post.getContent() == null
                 || post.getContent().isBlank())
             return Result.error(Result.ErrorCode.BAD_REQUEST);
@@ -31,13 +32,19 @@ public class PreCondicions extends JavaContentRep {
 
         Result<User> owner = uc.getUser(post.getAuthorId(), userPassword);
         if (!owner.isOK()) {
+            Log.info("Erro no owner WHAT?!?!?: " + owner.error());
             return Result.error(owner.error());
         }
 
         return Result.ok();
     }
 
-    public Result<String> updatePostPre(String postId, String userPassword, Post post) {
-        return Result.ok();
+    public Result<Post> getPost(Post p) {
+        Log.info("PRE Checking Null Post: " + (p == null));
+
+        if (p != null)
+            return Result.ok();
+        else return Result.error(Result.ErrorCode.NOT_FOUND);
     }
+
 }

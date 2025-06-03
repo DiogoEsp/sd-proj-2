@@ -18,6 +18,7 @@ import fctreddit.impl.server.Hibernate.TX;
 import fctreddit.impl.server.rest.Replication.ContentEffects;
 import fctreddit.impl.server.rest.Replication.PreCondicions;
 import fctreddit.utils.CreatePostArg;
+import fctreddit.utils.GetPostArg;
 import fctreddit.utils.SyncPoint;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
@@ -46,11 +47,12 @@ public class JavaContentRep extends JavaServer implements Content {
     public record ReplicationMessage(
             String operation,
             String jsonArgs
-    ) {}
+    ) {
+    }
 
     public JavaContentRep() {
         hibernate = Hibernate.getInstance();
-        pc = new PreCondicions(hibernate, Log);
+        pc = new PreCondicions(hibernate);
         ce = new ContentEffects(hibernate, Log, publisher, postLocks, serverURI);
     }
 
@@ -71,15 +73,12 @@ public class JavaContentRep extends JavaServer implements Content {
 
     public static void handleDeletedImages(String value) {
         Log.info("Received image deletion message: " + value);
-        // Supondo que o value seja o ID da imagem a eliminar
         String imageUrl = value.trim();
         if (imageUrl.isEmpty()) {
             Log.warning("Empty image ID received for deletion.");
             return;
         }
         try {
-            // Aqui, implementa o código para remover referências ou dados relacionados a essa imagem
-            // Exemplo simples: apagar da base de dados (pseudocódigo)
             TX tx = Hibernate.getInstance().beginTransaction();
             int deleted = Hibernate.getInstance().sql(tx, "UPDATE Post p SET p.mediaUrl=NULL where p.mediaUrl='" + imageUrl + "'");
             Hibernate.getInstance().commitTransaction(tx);
@@ -89,8 +88,8 @@ public class JavaContentRep extends JavaServer implements Content {
         }
     }
 
-    public static void handleReplication(ConsumerRecord<String, String> record){
-        long offset = record.offset(); // ← THIS is the version!
+    public static void handleReplication(ConsumerRecord<String, String> record) {
+        long offset = record.offset();
         String json = record.value();
 
         ReplicationMessage msg = gson.fromJson(json, ReplicationMessage.class);
@@ -101,21 +100,24 @@ public class JavaContentRep extends JavaServer implements Content {
                 Result<String> result = ce.createPost((Post) arg.data());
 
                 if (result.isOK()) {
-                    syncPoint.setResult(offset, result.value());  // success
+                    syncPoint.setResult(offset, result.value());
                 } else {
-                    syncPoint.setResult(offset, null); // or result.error() if you're tracking errors
+                    syncPoint.setResult(offset, null);
                 }
             }
-            // handle other ops...
+            case "GET" -> {
+                Log.info("Expected get operation");
+                GetPostArg arg = gson.fromJson(msg.jsonArgs(), GetPostArg.class);
+            }
         }
     }
 
     @Override
     public Result<String> createPost(Post post, String userPassword) {
 
-        Result<String> pre = pc.createUser(post, userPassword);
+        Result<String> pre = pc.createPost(post, userPassword);
 
-        if(!pre.isOK()){
+        if (!pre.isOK()) {
             return pre;
         }
 
@@ -127,22 +129,21 @@ public class JavaContentRep extends JavaServer implements Content {
         ReplicationMessage msg = new ReplicationMessage(CREATE, jsonArgs);
         String messageJson = gson.toJson(msg);
 
-// envia
         publisher.publish("replication", CREATE, messageJson);
         long offset = publisher.publish(REP_TOPIC, CREATE, messageJson);
 
         var r = syncPoint.waitForResult(offset);
         if (r == null) {
-            Log.info( "Timeout waiting for replication.");
+            Log.info("Timeout waiting for replication.");
             return Result.error(Result.ErrorCode.INTERNAL_ERROR);
         }
 
-        if(r.isOK()){
-            return Result.ok(r.value());
-        }
-        else{
+        if (r.isOK()) return Result.ok((String) r.value());
+        else {
+            Log.info("Erro no syncPoint!? " + r.error());
             return Result.error(r.error());
         }
+
     }
 
     @Override
@@ -197,6 +198,7 @@ public class JavaContentRep extends JavaServer implements Content {
     @Override
     public Result<Post> getPost(String postId) {
         Post p = hibernate.get(Post.class, postId);
+
         Result<Integer> res = this.getupVotes(postId);
         if (res.isOK())
             p.setUpVote(res.value());
@@ -204,10 +206,28 @@ public class JavaContentRep extends JavaServer implements Content {
         if (res.isOK())
             p.setDownVote(res.value());
 
-        if (p != null)
-            return Result.ok(p);
-        else
-            return Result.error(ErrorCode.NOT_FOUND);
+        Log.info("Checking Null Post: " + (p == null));
+        Result<Post> pre = pc.getPost(p);
+
+        if (!pre.isOK())
+            return pre;
+
+        GetPostArg arg = new GetPostArg(GET, postId);
+        String jsonArgs = gson.toJson(arg);
+        ReplicationMessage msg = new ReplicationMessage(GET, jsonArgs);
+        String messageJson = gson.toJson(msg);
+
+        publisher.publish(REP_TOPIC, GET, messageJson);
+        long offset = publisher.publish(REP_TOPIC, GET, messageJson);
+
+        var r = syncPoint.waitForResult(offset);
+        if (r == null) {
+            Log.info("Timout waiting for replication");
+            return Result.error(ErrorCode.INTERNAL_ERROR);
+        }
+
+        if (r.isOK()) return Result.ok((Post) r.value());
+        else return Result.error(r.error());
     }
 
     @Override
@@ -355,7 +375,7 @@ public class JavaContentRep extends JavaServer implements Content {
             List<String> descendants = hibernate.sql(tx,
                     "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
                     String.class);
-            for (String id : descendants){
+            for (String id : descendants) {
                 Log.info("Fetching descendant post with ID: " + id);
                 Post child = hibernate.get(tx, Post.class, id);
                 if (child == null) {
@@ -389,7 +409,7 @@ public class JavaContentRep extends JavaServer implements Content {
 
                 }
             }
-            if(p.getMediaUrl() != null)
+            if (p.getMediaUrl() != null)
                 hibernate.commitTransaction(tx);
 
         } catch (Exception e) {
