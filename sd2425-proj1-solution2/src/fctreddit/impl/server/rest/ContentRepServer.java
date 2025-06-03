@@ -1,14 +1,20 @@
 package fctreddit.impl.server.rest;
 
+import fctreddit.impl.kafka.KafkaPublisher;
+import fctreddit.impl.kafka.KafkaSubscriber;
+import fctreddit.impl.kafka.KafkaUtils;
+import fctreddit.impl.kafka.RecordProcessor;
 import fctreddit.impl.server.Discovery;
-import fctreddit.impl.server.java.JavaContent;
+import fctreddit.impl.server.java.JavaContentRep;
 import fctreddit.impl.server.rest.filter.VersionFilter;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 
 import javax.net.ssl.SSLContext;
 import java.net.InetAddress;
 import java.net.URI;
+import java.util.List;
 import java.util.logging.Logger;
 
 public class ContentRepServer {
@@ -38,8 +44,49 @@ public class ContentRepServer {
             Log.info(String.format("%s Server ready @ %s\n",  SERVICE, serverURI));
 
             Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
-            JavaContent.setDiscovery(d);
+            JavaContentRep.setDiscovery(d);
             d.start();
+
+            KafkaUtils.createTopic("posts");
+
+            KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+            JavaContentRep.setKafka(pub);
+            Log.info("crio bem");
+
+
+            KafkaUtils.createTopic("images");
+            KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
+
+            sub.start(new RecordProcessor() {
+                @Override
+                public void onReceive(ConsumerRecord<String, String> r) {
+                    try{
+                        String value = r.value().toString();
+                        JavaContentRep.handleDeletedImages(value);
+                    }catch(Exception e){
+                        System.out.println("Error: " + e.getMessage());
+                    }
+                }
+            });
+
+            KafkaUtils.createTopic("replication");
+            KafkaPublisher repPub = KafkaPublisher.createPublisher("kafka:9092");
+
+            KafkaSubscriber repSub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("replication"));
+
+
+            repSub.start(new RecordProcessor() {
+                @Override
+                public void onReceive(ConsumerRecord<String, String> record) {
+                    try {
+                        String json = record.value();
+                        JavaContentRep.handleReplication(json);
+                    } catch (Exception e) {
+                        System.out.println("Error handling replication event: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+            });
 
             //More code can be executed here...
         } catch( Exception e) {

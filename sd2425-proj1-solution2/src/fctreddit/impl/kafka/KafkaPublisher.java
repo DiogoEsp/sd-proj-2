@@ -41,4 +41,19 @@ public class KafkaPublisher {
             return -1;
         }
     }
+
+    //This method is to publish to a topic that relies on partitioning.
+    public long publish(String topic, String key, String value) {
+        try {
+            Future<RecordMetadata> promise = producer.send(new ProducerRecord<String, String>(topic, key, value));
+            RecordMetadata rec = promise.get();
+            System.out.println("Published to topic " + topic + " with offset " + rec.offset());
+            return rec.offset();
+        } catch (ExecutionException | InterruptedException x) {
+            x.printStackTrace();
+            return -1;
+        }
+    }
+
+
 }

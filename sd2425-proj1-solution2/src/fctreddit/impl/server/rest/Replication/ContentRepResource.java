@@ -1,10 +1,11 @@
-package fctreddit.impl.server.rest;
+package fctreddit.impl.server.rest.Replication;
 
 import fctreddit.api.Post;
 import fctreddit.api.java.Content;
 import fctreddit.api.java.Result;
 import fctreddit.api.rest.RestContent;
 import fctreddit.impl.server.java.JavaContent;
+import fctreddit.impl.server.rest.RestResource;
 import fctreddit.impl.server.rest.filter.VersionFilter;
 import jakarta.ws.rs.WebApplicationException;
 
