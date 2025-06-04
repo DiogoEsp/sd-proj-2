@@ -74,8 +74,8 @@ public class ImageServer {
 
                         System.out.println("Formatted Version: " + operation + " " + all);
                         switch (operation) {
-                            case "create" -> JavaImage.incrementRef(all, true);
-                            case "delete" -> JavaImage.incrementRef(all, false);
+                            case "create" -> JavaImage.incrementRef(all);
+                            case "delete" -> JavaImage.decrementRef(all);
                         }
                     } catch (Exception e) {
                         System.out.println("Error: " + e.getMessage());

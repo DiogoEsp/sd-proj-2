@@ -25,7 +25,7 @@ public class JavaImage extends JavaServer implements Image {
     private static final String baseUrl;
 
     static {
-        String hostname = "localhost"; // fallback
+        String hostname = "localhost";
         try {
             hostname = java.net.InetAddress.getLocalHost().getHostName();
         } catch (Exception e) {
@@ -34,7 +34,6 @@ public class JavaImage extends JavaServer implements Image {
         baseUrl = "https://" + hostname + ":8080/rest/image/";
     }
 
-    //change to private static final Map<String, Map< String, Boolena>> = new ConcurrentHashMap<>();
     private static final Map<String, Integer> refCount = new ConcurrentHashMap<>();
     private static final Map<String, Long> createdAt = new ConcurrentHashMap<>();
     private static KafkaPublisher publisher;
@@ -56,26 +55,23 @@ public class JavaImage extends JavaServer implements Image {
         }
     }
 
-    public static void incrementRef(String imageId, boolean isCreate) {
-        Log.info("Current keys in refCount: " + refCount.keySet());
-        if (isCreate) {
-            refCount.merge(imageId, 1, Integer::sum);
-            Log.info("merged + " + imageId);
-        }
-        else {
-            if (refCount.containsKey(imageId)) {
-                int current = refCount.get(imageId);
-                if (current > 1) {
-                    Log.info("Updating + " + imageId);
-                    refCount.put(imageId, current - 1);
-                }
-                else {
-                    Log.info("Removing Ref + " + imageId);
-                    refCount.remove(imageId);
-                }
-
+    public static void decrementRef(String imageId) {
+        if (refCount.containsKey(imageId)) {
+            int current = refCount.get(imageId);
+            if (current > 1) {
+                Log.info("Updating + " + imageId);
+                refCount.put(imageId, current - 1);
             }
+            else {
+                Log.info("Removing Ref + " + imageId);
+                refCount.remove(imageId);
+            }
+
         }
+    }
+
+    public static void incrementRef(String imageId) {
+        refCount.merge(imageId, 1, Integer::sum);
     }
 
     @Override
@@ -199,7 +195,7 @@ public class JavaImage extends JavaServer implements Image {
                             synchronized (JavaImage.class) {
                                 if (iFile.exists() && iFile.isFile()) {
                                     iFile.delete();
-                                    createdAt.remove(id); // limpar para evitar duplicação futura
+                                    createdAt.remove(id);
                                     System.out.println("imagem foi apagada? " + !iFile.exists());
                                 }
                             }

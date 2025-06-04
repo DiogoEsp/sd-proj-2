@@ -105,8 +105,7 @@ public class JavaContent extends JavaServer implements Content {
 			try {
 				hibernate.persist(tx, post);
 				hibernate.commitTransaction(tx);
-			} catch (Exception ex) { // The transaction has failed, which means we have to restart the whole
-										// transaction
+			} catch (Exception ex) {
 				Log.info("Failed to commit transaction creating post");
 				ex.printStackTrace();
 
@@ -393,15 +392,12 @@ public class JavaContent extends JavaServer implements Content {
 				}
 
 				if (d.getMediaUrl() != null) {
-					String imageId = extractResourceID(d.getMediaUrl());
 					String stringBuilt = "delete " + d.getMediaUrl();
 					publisher.publish("posts", stringBuilt);
-
 				}
 			}
-			if(p.getMediaUrl() != null)
-				hibernate.commitTransaction(tx);
 
+			hibernate.commitTransaction(tx);
 		} catch (Exception e) {
 			e.printStackTrace();
 			hibernate.abortTransaction(tx);
