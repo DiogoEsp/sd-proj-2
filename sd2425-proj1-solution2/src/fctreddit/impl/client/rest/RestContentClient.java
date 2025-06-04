@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.logging.Logger;
 
+import fctreddit.impl.server.rest.security.SecretManager;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
 
@@ -160,9 +161,12 @@ public class RestContentClient extends ContentClient {
 	@Override
 	public Result<Void> removeTracesOfUser(String userId) {
 		Log.info("Executing a remote removeTracesOfUser for " + userId);
-		Response r = executeDelete(target.path(RestContent.CLEAR).path(userId)
-				.request());
-		
+		Response r = executeDelete(
+				target.path(RestContent.CLEAR)
+						.path(userId)
+						.request()
+						.header("X-SECRET", SecretManager.getInstance().getSecret())
+		);
 		return extractResponseWithoutBody(r);
 	}
 

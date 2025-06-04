@@ -1,4 +1,4 @@
-package fctreddit.impl.server.rest.Replication;
+package fctreddit.impl.server.rest.replication;
 
 import fctreddit.api.Post;
 import fctreddit.api.java.Result;

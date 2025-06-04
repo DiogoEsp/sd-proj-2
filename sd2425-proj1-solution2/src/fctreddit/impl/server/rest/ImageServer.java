@@ -9,6 +9,7 @@ import fctreddit.impl.kafka.KafkaPublisher;
 import fctreddit.impl.kafka.KafkaSubscriber;
 import fctreddit.impl.kafka.KafkaUtils;
 import fctreddit.impl.kafka.RecordProcessor;
+import fctreddit.impl.server.rest.security.SecretManager;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -34,6 +35,9 @@ public class ImageServer {
 
     public static void main(String[] args) {
         try {
+
+            String arg = args[0];
+            SecretManager.getInstance().setSecret(arg);
 
             ResourceConfig config = new ResourceConfig();
             config.register(ImageResource.class);

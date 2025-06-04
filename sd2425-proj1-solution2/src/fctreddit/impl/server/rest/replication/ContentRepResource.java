@@ -1,10 +1,9 @@
-package fctreddit.impl.server.rest.Replication;
+package fctreddit.impl.server.rest.replication;
 
 import fctreddit.api.Post;
 import fctreddit.api.java.Content;
 import fctreddit.api.java.Result;
 import fctreddit.api.rest.RestContent;
-import fctreddit.impl.server.java.JavaContent;
 import fctreddit.impl.server.java.JavaContentRep;
 import fctreddit.impl.server.rest.RestResource;
 import fctreddit.impl.server.rest.filter.VersionFilter;

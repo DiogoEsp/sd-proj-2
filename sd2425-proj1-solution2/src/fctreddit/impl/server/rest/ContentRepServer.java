@@ -6,7 +6,7 @@ import fctreddit.impl.kafka.KafkaUtils;
 import fctreddit.impl.kafka.RecordProcessor;
 import fctreddit.impl.server.Discovery;
 import fctreddit.impl.server.java.JavaContentRep;
-import fctreddit.impl.server.rest.Replication.ContentRepResource;
+import fctreddit.impl.server.rest.replication.ContentRepResource;
 import fctreddit.impl.server.rest.filter.VersionFilter;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;

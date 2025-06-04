@@ -7,12 +7,18 @@ import fctreddit.api.java.Content;
 import fctreddit.api.java.Result;
 import fctreddit.api.rest.RestContent;
 import fctreddit.impl.server.java.JavaContent;
+import fctreddit.impl.server.rest.security.SecretManager;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 
 public class ContentResource extends RestResource implements RestContent {
 
 	private Content impl;
-	
+
+	@Context
+	private HttpHeaders headers;
+
 	public ContentResource() {
 		this.impl = new JavaContent();
 	}
@@ -127,11 +133,15 @@ public class ContentResource extends RestResource implements RestContent {
 		
 		return res.value();
 	}
-	
+
 	@Override
 	public void removeTracesOfUser(String userId) {
 		Result<Void> res = impl.removeTracesOfUser(userId);
-		
+		String secret = headers.getHeaderString("X-SECRET");
+
+		if (!SecretManager.getInstance().isValid(secret))
+			throw new WebApplicationException(errorCodeToStatus(Result.ErrorCode.FORBIDDEN));
+
 		if(!res.isOK())
 			throw new WebApplicationException(errorCodeToStatus(res.error()));
 

@@ -4,6 +4,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.util.logging.Logger;
 
+import fctreddit.impl.server.rest.security.SecretManager;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 
@@ -27,7 +28,9 @@ public class UsersServer {
 	
 	public static void main(String[] args) {
 		try {
-			System.out.println("server");
+			String arg = args[0];
+			SecretManager.getInstance().setSecret(arg);
+
 			ResourceConfig config = new ResourceConfig();
 			config.register(UsersResource.class);
 	

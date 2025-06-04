@@ -1,14 +1,11 @@
-package fctreddit.impl.server.rest.Replication;
+package fctreddit.impl.server.rest.replication;
 
 import fctreddit.api.Post;
 import fctreddit.api.User;
 import fctreddit.api.java.Result;
 import fctreddit.api.java.Users;
 import fctreddit.api.rest.RestContent;
-import fctreddit.impl.client.UsersClient;
 import fctreddit.impl.server.Hibernate;
-import fctreddit.impl.server.java.JavaContentRep;
-import org.hibernate.event.spi.ResolveNaturalIdEventListener;
 
 import java.util.List;
 import java.util.logging.Logger;
