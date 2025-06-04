@@ -33,6 +33,8 @@ public class JavaImage extends JavaServer implements Image {
         }
         baseUrl = "https://" + hostname + ":8080/rest/image/";
     }
+
+    //change to private static final Map<String, Map< String, Boolena>> = new ConcurrentHashMap<>();
     private static final Map<String, Integer> refCount = new ConcurrentHashMap<>();
     private static final Map<String, Long> createdAt = new ConcurrentHashMap<>();
     private static KafkaPublisher publisher;

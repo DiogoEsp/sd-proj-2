@@ -5,25 +5,32 @@ import fctreddit.api.java.Content;
 import fctreddit.api.java.Result;
 import fctreddit.api.rest.RestContent;
 import fctreddit.impl.server.java.JavaContent;
+import fctreddit.impl.server.java.JavaContentRep;
 import fctreddit.impl.server.rest.RestResource;
 import fctreddit.impl.server.rest.filter.VersionFilter;
 import jakarta.ws.rs.WebApplicationException;
 
 import java.util.List;
+import java.util.logging.Logger;
 
 public class ContentRepResource extends RestResource implements RestContent {
     private Content impl;
+    private Logger Log= Logger.getLogger(ContentRepResource.class.getName());
 
     public ContentRepResource() {
-        this.impl = new JavaContent();
+        this.impl = new JavaContentRep();
     }
 
     @Override
     public String createPost(Post post, String userPassword) {
         Result<String> res = impl.createPost(post, userPassword);
 
-        if(res.isOK())
+        Log.info("resource" + res.toString());
+
+        if(res.isOK()) {
+            Log.info("foi ok");
             return res.value();
+        }
         else
             throw new WebApplicationException(errorCodeToStatus(res.error()));
     }
@@ -31,8 +38,6 @@ public class ContentRepResource extends RestResource implements RestContent {
     @Override
     public List<String> getPosts(long timestamp, String sortOrder) {
         Result<List<String>> res = impl.getPosts(timestamp, sortOrder);
-
-        Long clientVersion = VersionFilter.version.get();
 
         if(res.isOK())
             return res.value();

@@ -1,40 +1,32 @@
 package fctreddit.impl.server.rest.Replication;
 
 import fctreddit.api.Post;
-import fctreddit.api.java.Content;
 import fctreddit.api.java.Result;
-import fctreddit.api.rest.RestContentRep;
 import fctreddit.impl.kafka.KafkaPublisher;
 import fctreddit.impl.server.Hibernate;
 import fctreddit.impl.server.java.JavaContentRep;
 import fctreddit.impl.server.java.JavaServer;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response;
 
 import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
 import java.util.logging.Logger;
 
 public class ContentEffects extends JavaServer {
 
-    private Hibernate hibernate;
-    private Logger Log;
+    private Hibernate hibernate = Hibernate.getInstance();
+    private Logger Log = Logger.getLogger(ContentEffects.class.getName());
     private KafkaPublisher publisher;
     private HashMap<String, String> postLocks;
     private String serverURI;
 
 
-    public ContentEffects(Hibernate hibermnate, Logger Log, KafkaPublisher publisher, HashMap<String, String> postLocks, String serverUri){
-        this.hibernate = hibermnate;
-        this.Log = Log;
+    public ContentEffects( KafkaPublisher publisher, HashMap<String, String> postLocks, String serverUri){
         this.publisher = publisher;
         this.postLocks = postLocks;
         this.serverURI = serverUri;
     }
 
     public Result<String> createPost(Post post){
-
+Log.info("tá no effects");
         Hibernate.TX tx = hibernate.beginTransaction();
 
         if (post.getParentUrl() != null && !post.getParentUrl().isBlank()) {
@@ -107,6 +99,32 @@ public class ContentEffects extends JavaServer {
         return Result.ok(post.getPostId());
     }
 
+    public Result<Post> updatepost(Post p, Post post){
+
+        Hibernate.TX tx = hibernate.beginTransaction();
+
+        // We can update finally
+        if (post.getContent() != null)
+            p.setContent(post.getContent());
+        if (post.getMediaUrl() != null) {
+            String stringBuilt = "delete " + p.getMediaUrl();
+            publisher.publish("posts", stringBuilt);
+            p.setMediaUrl(post.getMediaUrl());
+            stringBuilt = "create " + p.getMediaUrl();
+            publisher.publish("posts", stringBuilt);
+        }
+
+
+        try {
+            hibernate.persist(tx, p);
+            hibernate.commitTransaction(tx);
+        } catch (Exception e) {
+            hibernate.abortTransaction(tx);
+            return Result.error(Result.ErrorCode.BAD_REQUEST);
+        }
+
+        return Result.ok(p);
+    }
 
 
 }

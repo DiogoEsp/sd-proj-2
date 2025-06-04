@@ -17,6 +17,7 @@ import fctreddit.impl.server.Hibernate;
 import fctreddit.impl.server.Hibernate.TX;
 import fctreddit.impl.server.rest.Replication.ContentEffects;
 import fctreddit.impl.server.rest.Replication.PreCondicions;
+import fctreddit.impl.server.rest.filter.VersionFilter;
 import fctreddit.utils.CreatePostArg;
 import fctreddit.utils.GetPostArg;
 import fctreddit.utils.SyncPoint;
@@ -29,6 +30,7 @@ public class JavaContentRep extends JavaServer implements Content {
     private static final String REP_TOPIC = "replication";
 
     private static final String CREATE = "CREATE";
+    private static final String UPDATE = "UPDATE";
     private static final String GET = "GET";
 
     private static Logger Log = Logger.getLogger(JavaContentRep.class.getName());
@@ -38,10 +40,10 @@ public class JavaContentRep extends JavaServer implements Content {
     public static final HashMap<String, String> postLocks = new HashMap<String, String>();
 
     private static String serverURI;
-    private static PreCondicions pc;
-    private static ContentEffects ce;
+    private PreCondicions pc;
+    private ContentEffects ce;
     private static KafkaPublisher publisher;
-    private static final SyncPoint syncPoint = SyncPoint.getSyncPoint();
+    private SyncPoint syncPoint = SyncPoint.getSyncPoint();
     private static KafkaPublisher repPublisher;
 
     public record ReplicationMessage(
@@ -52,8 +54,8 @@ public class JavaContentRep extends JavaServer implements Content {
 
     public JavaContentRep() {
         hibernate = Hibernate.getInstance();
-        pc = new PreCondicions(hibernate);
-        ce = new ContentEffects(hibernate, Log, publisher, postLocks, serverURI);
+        this.pc = new PreCondicions(hibernate,getUsersClient());
+        this.ce = new ContentEffects(publisher, postLocks, serverURI);
     }
 
     public static void setKafka(KafkaPublisher publisher) {
@@ -88,57 +90,59 @@ public class JavaContentRep extends JavaServer implements Content {
         }
     }
 
-    public static void handleReplication(ConsumerRecord<String, String> record) {
+    public void handleReplication(ConsumerRecord<String, String> record) {
         long offset = record.offset();
         String json = record.value();
 
-        ReplicationMessage msg = gson.fromJson(json, ReplicationMessage.class);
-
-        switch (msg.operation()) {
-            case "CREATE" -> {
-                CreatePostArg arg = gson.fromJson(msg.jsonArgs(), CreatePostArg.class);
-                Result<String> result = ce.createPost((Post) arg.data());
-
-                if (result.isOK()) {
-                    syncPoint.setResult(offset, result.value());
-                } else {
-                    syncPoint.setResult(offset, null);
-                }
-            }
-            case "GET" -> {
-                Log.info("Expected get operation");
-                GetPostArg arg = gson.fromJson(msg.jsonArgs(), GetPostArg.class);
+try {
+    switch (record.key()) {
+        case CREATE -> {
+            Post msg = gson.fromJson(json, Post.class);
+            Log.info("O meu post ta  aqi " + msg.toString());
+            Result<String> result = ce.createPost(msg);
+            Log.info("rArcadia" + result);
+            try {
+                syncPoint.setResult(offset, result);
+            } catch (Exception e) {
+                Log.severe(e.getMessage());
             }
         }
+        case UPDATE -> {
+            String[] args = json.split("///");
+            Post p = gson.fromJson(args[0], Post.class);
+            Post post = gson.fromJson(args[1], Post.class);
+            Result<Post> res = ce.updatepost(p, post);
+            try {
+                syncPoint.setResult(offset, res);
+            } catch (Exception e) {
+                Log.severe(e.getMessage());
+            }
+        }
+        default -> System.out.println("Unknown operation");
+    }
+}catch (Exception e){
+    Log.severe(e.getMessage());
+}
     }
 
     @Override
     public Result<String> createPost(Post post, String userPassword) {
-
         Result<String> pre = pc.createPost(post, userPassword);
 
         if (!pre.isOK()) {
             return pre;
         }
-
         String id = UUID.randomUUID().toString();
         post.setPostId(id);
 
-        CreatePostArg arg = new CreatePostArg(CREATE, post);
-        String jsonArgs = gson.toJson(arg);
-        ReplicationMessage msg = new ReplicationMessage(CREATE, jsonArgs);
-        String messageJson = gson.toJson(msg);
 
-        publisher.publish("replication", CREATE, messageJson);
-        long offset = publisher.publish(REP_TOPIC, CREATE, messageJson);
+        String message = gson.toJson(post);
 
-        var r = syncPoint.waitForResult(offset);
-        if (r == null) {
-            Log.info("Timeout waiting for replication.");
-            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
-        }
+        long offset = publisher.publish(REP_TOPIC, CREATE, message);
+        Result<?> r = syncPoint.waitForResult(offset);
+        Log.info("O resultado do syncPoint" + r.toString());
 
-        if (r.isOK()) return Result.ok((String) r.value());
+        if (r.isOK()) return Result.ok((String) r.value()) ;
         else {
             Log.info("Erro no syncPoint!? " + r.error());
             return Result.error(r.error());
@@ -148,6 +152,8 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<List<String>> getPosts(long timestamp, String sortOrder) {
+
+        syncPoint.waitForVersion(VersionFilter.version.get());
         Log.info("Getting Posts with timestamp=" + timestamp + " sortOrder=" + sortOrder);
 
         String baseSQLStatement = null;
@@ -181,13 +187,13 @@ public class JavaContentRep extends JavaServer implements Content {
             List<String> list = null;
             Log.info("Executing selection of Posts with the following query:\n" + baseSQLStatement);
             list = hibernate.sql(baseSQLStatement, String.class);
-            Log.info("Output generated (in this order):");
+           /** Log.info("Output generated (in this order):");
             for (int i = 0; i < list.size(); i++) {
                 Log.info("\t" + list.get(i).toString() + " \ttimestamp: "
                         + hibernate.get(Post.class, list.get(i)).getCreationTimestamp() + " \tReplies: "
                         + this.getPostAnswers(list.get(i), 0).value().size() + " \tUpvotes: "
                         + this.getupVotes(list.get(i)).value());
-            }
+            }*/
             return Result.ok(list);
         } catch (Exception e) {
             e.printStackTrace();
@@ -197,6 +203,7 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<Post> getPost(String postId) {
+        syncPoint.waitForVersion(VersionFilter.version.get());
         Post p = hibernate.get(Post.class, postId);
 
         Result<Integer> res = this.getupVotes(postId);
@@ -232,115 +239,86 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<List<String>> getPostAnswers(String postId, long maxTimeout) {
-        Log.info("Getting Answers for Post " + postId + " maxTimeout=" + maxTimeout);
+        syncPoint.waitForVersion(VersionFilter.version.get());
+            long startOperation = System.currentTimeMillis();
+            Log.info("Getting Answers for Post " + postId + " maxTimeout=" + maxTimeout);
 
-        Post p = hibernate.get(Post.class, postId);
-        if (p == null)
-            return Result.error(ErrorCode.NOT_FOUND);
+            Post p = hibernate.get(Post.class, postId);
+            if (p == null)
+                return Result.error(ErrorCode.NOT_FOUND);
 
-        if (maxTimeout > 0) {
-            String lock = null;
-            synchronized (JavaContentRep.postLocks) {
-                lock = JavaContentRep.postLocks.get(postId);
+            String parentURL = serverURI + RestContent.PATH + "/" + postId;
+            List<String> list = null;
+            try {
+                list = hibernate.sql(
+                        "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
+                        String.class);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return Result.error(ErrorCode.INTERNAL_ERROR);
             }
 
-            synchronized (lock) {
-                try {
-                    lock.wait(maxTimeout);
-                } catch (InterruptedException e) {
-                    // Ignore this case...
+            if (maxTimeout > 0) {
+                String lock = null;
+                synchronized (JavaContentRep.postLocks) {
+                    lock = JavaContentRep.postLocks.get(postId);
+                }
+                synchronized (lock) {
+                    long deadline = startOperation + maxTimeout;
+
+                    while (System.currentTimeMillis() < deadline) {
+
+                        try {
+                            long waitTime = deadline - System.currentTimeMillis();
+                            if(waitTime > 0)
+                                lock.wait(waitTime);
+                        } catch (InterruptedException e) {
+                            // Ignore this case...
+                        }
+
+                        List<String> redo = null;
+                        try {
+                            redo = hibernate.sql("SELECT p.postId from Post p WHERE p.parentURL='" + parentURL
+                                    + "' ORDER BY p.creationTimestamp", String.class);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return Result.error(ErrorCode.INTERNAL_ERROR);
+                        }
+
+                        if (redo.size() > list.size()) {
+                            list = redo;
+                            break;
+                        }
+
+                    }
                 }
             }
-        }
 
-        String parentURL = serverURI + RestContent.PATH + "/" + postId;
-
-        try {
-            List<String> list = null;
-            list = hibernate.sql(
-                    "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
-                    String.class);
             return Result.ok(list);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Result.error(ErrorCode.INTERNAL_ERROR);
-        }
     }
 
     @Override
     public Result<Post> updatePost(String postId, String userPassword, Post post) {
-        TX tx = hibernate.beginTransaction();
 
-        Post p = hibernate.get(tx, Post.class, postId);
-
-        if (p == null) {
-            hibernate.abortTransaction(tx);
-            return Result.error(ErrorCode.NOT_FOUND);
+        Result<Post> res = pc.updatePost(postId, userPassword, post);
+        Post p;
+        if(!res.isOK()){
+            return res;
+        }else{
+            p = res.value();
         }
 
-        if (post.getPostId() != null) {
-            hibernate.abortTransaction(tx);
-            Log.info("Cannot update post" + postId + ", since the postId cannot be updated");
-            return Result.error(ErrorCode.BAD_REQUEST);
+        String message = gson.toJson(p) + "///" + gson.toJson(post);
+
+        long offset = publisher.publish(REP_TOPIC, UPDATE, message);
+        Result<?> r = syncPoint.waitForResult(offset);
+
+
+        if (r.isOK()) return Result.ok((Post) r.value()) ;
+        else {
+            Log.info("Erro no syncPoint!? " + r.error());
+            return Result.error(r.error());
         }
-
-        if (post.getAuthorId() != null) {
-            hibernate.abortTransaction(tx);
-            Log.info("Cannot update post" + postId + ", since the authordId cannot be updated");
-            return Result.error(ErrorCode.BAD_REQUEST);
-        }
-
-        if (userPassword == null) {
-            hibernate.abortTransaction(tx);
-            Log.info("Cannot update post" + postId + ", since no user password was provided");
-            return Result.error(ErrorCode.FORBIDDEN);
-        }
-
-        Result<User> u = this.getUsersClient().getUser(p.getAuthorId(), userPassword);
-        if (!u.isOK()) {
-            hibernate.abortTransaction(tx);
-            return Result.error(u.error());
-        }
-
-        // Check if there are answers
-        String parentURL = serverURI + RestContent.PATH + "/" + postId;
-        if (hibernate.sql(tx, "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "'", String.class)
-                .size() > 0) {
-            hibernate.abortTransaction(tx);
-            Log.info("Cannot update post" + postId + ", since there is at least one answer.");
-            return Result.error(ErrorCode.BAD_REQUEST);
-        }
-
-        // Check if there are votes
-        List<Integer> resp = hibernate.sql(tx, "SELECT COUNT(*) from PostVote pv WHERE pv.postId='" + postId + "'",
-                Integer.class);
-        if (resp.iterator().next() > 0) {
-            hibernate.abortTransaction(tx);
-            Log.info("Cannot update post" + postId + ", since there is at least one upVote.");
-            return Result.error(ErrorCode.BAD_REQUEST);
-        }
-
-        // We can update finally
-        if (post.getContent() != null)
-            p.setContent(post.getContent());
-        if (post.getMediaUrl() != null) {
-            String stringBuilt = "delete " + p.getMediaUrl();
-            publisher.publish("posts", stringBuilt);
-            p.setMediaUrl(post.getMediaUrl());
-            stringBuilt = "create " + p.getMediaUrl();
-            publisher.publish("posts", stringBuilt);
-        }
-
-
-        try {
-            hibernate.persist(tx, p);
-            hibernate.commitTransaction(tx);
-        } catch (Exception e) {
-            hibernate.abortTransaction(tx);
-            return Result.error(ErrorCode.BAD_REQUEST);
-        }
-
-        return Result.ok(p);
     }
 
     @Override

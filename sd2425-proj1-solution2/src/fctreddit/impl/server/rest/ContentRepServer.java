@@ -70,19 +70,19 @@ public class ContentRepServer {
 
             KafkaUtils.createTopic("replication");
             KafkaPublisher repPub = KafkaPublisher.createPublisher("kafka:9092");
+            JavaContentRep.setKafkaRep(repPub);
+            System.out.println("Setted publisher");
 
             KafkaSubscriber repSub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("replication"));
+            System.out.println("Setted subscriber");
 
             repSub.start(new RecordProcessor() {
                 @Override
                 public void onReceive(ConsumerRecord<String, String> record) {
-                    try {
-                        Log.info("Handling Replication!");
-                        JavaContentRep.handleReplication(record);
-                    } catch (Exception e) {
-                        System.out.println("Error handling replication event: " + e.getMessage());
-                        e.printStackTrace();
-                    }
+
+                    JavaContentRep rep = new JavaContentRep();
+                    Log.info("Handling Replication!");
+                    rep.handleReplication(record);
                 }
             });
 
