@@ -33,6 +33,26 @@ public class ContentServer {
 	private static final String SERVER_URI_FMT = "https://%s:%s/rest";
 
 	public static void main(String[] args) {
+
+		KafkaUtils.createTopic("posts");
+		KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+		JavaContent.setKafka(pub);
+
+		KafkaUtils.createTopic("images");
+		KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
+
+		sub.start(new RecordProcessor() {
+			@Override
+			public void onReceive(ConsumerRecord<String, String> r) {
+				try{
+					String value = r.value().toString();
+					JavaContent.handleDeletedImages(value);
+				}catch(Exception e){
+					System.out.println("Error: " + e.getMessage());
+				}
+			}
+		});
+
 		try {
 
 			String arg = args[0];
@@ -53,28 +73,6 @@ public class ContentServer {
 			Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
 			JavaContent.setDiscovery(d);
 			d.start();
-
-			KafkaUtils.createTopic("posts");
-
-			KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
-			JavaContent.setKafka(pub);
-			Log.info("crio bem");
-
-
-			KafkaUtils.createTopic("images");
-			KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
-
-			sub.start(new RecordProcessor() {
-				@Override
-				public void onReceive(ConsumerRecord<String, String> r) {
-					try{
-						String value = r.value().toString();
-						JavaContent.handleDeletedImages(value);
-					}catch(Exception e){
-						System.out.println("Error: " + e.getMessage());
-					}
-				}
-			});
 
 		} catch( Exception e) {
 			Log.severe(e.getMessage());

@@ -32,62 +32,64 @@ public class ContentRepServer {
     private static final String SERVER_URI_FMT = "https://%s:%s/rest";
 
     public static void main(String[] args) {
+
+        KafkaUtils.createTopic("posts");
+
+        KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+        JavaContentRep.setKafka(pub);
+
+        KafkaUtils.createTopic("images");
+        KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
+
+        KafkaUtils.createTopic("replication");
+        KafkaPublisher repPub = KafkaPublisher.createPublisher("kafka:9092");
+        JavaContentRep.setKafkaRep(repPub);
+        System.out.println("Setted publisher");
+
+        KafkaSubscriber repSub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("replication"));
+        System.out.println("Setted subscriber");
+
+
+
         try {
             ResourceConfig config = new ResourceConfig();
-            config.register(ContentRepResource.class);
             config.register(VersionFilter.class);
+            config.register(ContentRepResource.class);
 
             String hostname = InetAddress.getLocalHost().getHostName();
             String serverURI = String.format(SERVER_URI_FMT, hostname, PORT);
-            JdkHttpServerFactory.createHttpServer( URI.create(serverURI), config, SSLContext.getDefault());
+            JdkHttpServerFactory.createHttpServer(URI.create(serverURI), config, SSLContext.getDefault());
 
-            Log.info(String.format("%s Replication Server ready @ %s\n",  SERVICE, serverURI));
+
+
+            Log.info(String.format("%s Replication Server ready @ %s\n", SERVICE, serverURI));
 
             Discovery d = new Discovery(Discovery.DISCOVERY_ADDR, SERVICE, serverURI);
             JavaContentRep.setDiscovery(d);
+            JavaContentRep rep = JavaContentRep.getInstance();
             d.start();
-
-            KafkaUtils.createTopic("posts");
-
-            KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
-            JavaContentRep.setKafka(pub);
-
-            KafkaUtils.createTopic("images");
-            KafkaSubscriber sub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("images"));
-
-            sub.start(new RecordProcessor() {
-                @Override
-                public void onReceive(ConsumerRecord<String, String> r) {
-                    try{
-                        Log.info("Operation deleteImages with subscriber");
-                        String value = r.value();
-                        JavaContentRep.handleDeletedImages(value);
-                    }catch(Exception e){
-                        System.out.println("Error: " + e.getMessage());
-                    }
-                }
-            });
-
-            KafkaUtils.createTopic("replication");
-            KafkaPublisher repPub = KafkaPublisher.createPublisher("kafka:9092");
-            JavaContentRep.setKafkaRep(repPub);
-            System.out.println("Setted publisher");
-
-            KafkaSubscriber repSub = KafkaSubscriber.createSubscriber("kafka:9092", List.of("replication"));
-            System.out.println("Setted subscriber");
-
             repSub.start(new RecordProcessor() {
                 @Override
                 public void onReceive(ConsumerRecord<String, String> record) {
-
-                    JavaContentRep rep = new JavaContentRep();
                     Log.info("Handling Replication!");
                     rep.handleReplication(record);
                 }
             });
 
+            sub.start(new RecordProcessor() {
+                @Override
+                public void onReceive(ConsumerRecord<String, String> r) {
+                    try {
+                        Log.info("Operation deleteImages with subscriber");
+                        String value = r.value();
+                        rep.handleDeletedImages(value);
+                    } catch (Exception e) {
+                        System.out.println("Error: " + e.getMessage());
+                    }
+                }
+            });
             //More code can be executed here...
-        } catch( Exception e) {
+        } catch (Exception e) {
             Log.severe(e.getMessage());
         }
     }

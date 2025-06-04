@@ -19,14 +19,14 @@ public class ContentEffects extends JavaServer {
     private String serverURI;
 
 
-    public ContentEffects( KafkaPublisher publisher, HashMap<String, String> postLocks, String serverUri){
+    public ContentEffects(KafkaPublisher publisher, HashMap<String, String> postLocks, String serverUri) {
         this.publisher = publisher;
         this.postLocks = postLocks;
         this.serverURI = serverUri;
     }
 
-    public Result<String> createPost(Post post){
-Log.info("tá no effects");
+    public Result<String> createPost(Post post) {
+        Log.info("tá no effects");
         Hibernate.TX tx = hibernate.beginTransaction();
 
         if (post.getParentUrl() != null && !post.getParentUrl().isBlank()) {
@@ -99,7 +99,7 @@ Log.info("tá no effects");
         return Result.ok(post.getPostId());
     }
 
-    public Result<Post> updatepost(Post p, Post post){
+    public Result<Post> updatepost(Post p, Post post) {
 
         Hibernate.TX tx = hibernate.beginTransaction();
 

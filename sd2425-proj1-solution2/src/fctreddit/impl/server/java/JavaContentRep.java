@@ -26,6 +26,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 public class JavaContentRep extends JavaServer implements Content {
 
+    private static JavaContentRep instance;
     private static final String REP_TOPIC = "replication";
 
     private static final String CREATE = "CREATE";
@@ -51,9 +52,15 @@ public class JavaContentRep extends JavaServer implements Content {
     ) {
     }
 
-    public JavaContentRep() {
+    public static JavaContentRep getInstance() {
+        if (instance == null)
+            instance = new JavaContentRep();
+        return instance;
+    }
+
+    private JavaContentRep() {
         hibernate = Hibernate.getInstance();
-        this.pc = new PreCondicions(hibernate,getUsersClient());
+        this.pc = new PreCondicions(hibernate, getUsersClient());
         this.ce = new ContentEffects(publisher, postLocks, serverURI);
     }
 
@@ -72,7 +79,7 @@ public class JavaContentRep extends JavaServer implements Content {
             JavaContentRep.serverURI = serverURI;
     }
 
-    public static void handleDeletedImages(String value) {
+    public void handleDeletedImages(String value) {
         Log.info("Received image deletion message: " + value);
         String imageUrl = value.trim();
         if (imageUrl.isEmpty()) {
@@ -93,35 +100,35 @@ public class JavaContentRep extends JavaServer implements Content {
         long offset = record.offset();
         String json = record.value();
 
-try {
-    switch (record.key()) {
-        case CREATE -> {
-            Post msg = gson.fromJson(json, Post.class);
-            Log.info("O meu post ta  aqi " + msg.toString());
-            Result<String> result = ce.createPost(msg);
-            Log.info("rArcadia" + result);
-            try {
-                syncPoint.setResult(offset, result);
-            } catch (Exception e) {
-                Log.severe(e.getMessage());
+        try {
+            switch (record.key()) {
+                case CREATE -> {
+                    Post msg = gson.fromJson(json, Post.class);
+                    Log.info("O meu post ta  aqi " + msg.toString());
+                    Result<String> result = ce.createPost(msg);
+                    Log.info("rArcadia" + result);
+                    try {
+                        syncPoint.setResult(offset, result);
+                    } catch (Exception e) {
+                        Log.severe(e.getMessage());
+                    }
+                }
+                case UPDATE -> {
+                    String[] args = json.split("///");
+                    Post p = gson.fromJson(args[0], Post.class);
+                    Post post = gson.fromJson(args[1], Post.class);
+                    Result<Post> res = ce.updatepost(p, post);
+                    try {
+                        syncPoint.setResult(offset, res);
+                    } catch (Exception e) {
+                        Log.severe(e.getMessage());
+                    }
+                }
+                default -> System.out.println("Unknown operation");
             }
+        } catch (Exception e) {
+            Log.severe(e.getMessage());
         }
-        case UPDATE -> {
-            String[] args = json.split("///");
-            Post p = gson.fromJson(args[0], Post.class);
-            Post post = gson.fromJson(args[1], Post.class);
-            Result<Post> res = ce.updatepost(p, post);
-            try {
-                syncPoint.setResult(offset, res);
-            } catch (Exception e) {
-                Log.severe(e.getMessage());
-            }
-        }
-        default -> System.out.println("Unknown operation");
-    }
-}catch (Exception e){
-    Log.severe(e.getMessage());
-}
     }
 
     @Override
@@ -141,7 +148,7 @@ try {
         Result<?> r = syncPoint.waitForResult(offset);
         Log.info("O resultado do syncPoint" + r.toString());
 
-        if (r.isOK()) return Result.ok((String) r.value()) ;
+        if (r.isOK()) return Result.ok((String) r.value());
         else {
             Log.info("Erro no syncPoint!? " + r.error());
             return Result.error(r.error());
@@ -186,13 +193,13 @@ try {
             List<String> list = null;
             Log.info("Executing selection of Posts with the following query:\n" + baseSQLStatement);
             list = hibernate.sql(baseSQLStatement, String.class);
-           /** Log.info("Output generated (in this order):");
-            for (int i = 0; i < list.size(); i++) {
-                Log.info("\t" + list.get(i).toString() + " \ttimestamp: "
-                        + hibernate.get(Post.class, list.get(i)).getCreationTimestamp() + " \tReplies: "
-                        + this.getPostAnswers(list.get(i), 0).value().size() + " \tUpvotes: "
-                        + this.getupVotes(list.get(i)).value());
-            }*/
+            /** Log.info("Output generated (in this order):");
+             for (int i = 0; i < list.size(); i++) {
+             Log.info("\t" + list.get(i).toString() + " \ttimestamp: "
+             + hibernate.get(Post.class, list.get(i)).getCreationTimestamp() + " \tReplies: "
+             + this.getPostAnswers(list.get(i), 0).value().size() + " \tUpvotes: "
+             + this.getupVotes(list.get(i)).value());
+             }*/
             return Result.ok(list);
         } catch (Exception e) {
             e.printStackTrace();
@@ -239,61 +246,61 @@ try {
     @Override
     public Result<List<String>> getPostAnswers(String postId, long maxTimeout) {
         syncPoint.waitForVersion(VersionFilter.version.get());
-            long startOperation = System.currentTimeMillis();
-            Log.info("Getting Answers for Post " + postId + " maxTimeout=" + maxTimeout);
+        long startOperation = System.currentTimeMillis();
+        Log.info("Getting Answers for Post " + postId + " maxTimeout=" + maxTimeout);
 
-            Post p = hibernate.get(Post.class, postId);
-            if (p == null)
-                return Result.error(ErrorCode.NOT_FOUND);
+        Post p = hibernate.get(Post.class, postId);
+        if (p == null)
+            return Result.error(ErrorCode.NOT_FOUND);
 
-            String parentURL = serverURI + RestContent.PATH + "/" + postId;
-            List<String> list = null;
-            try {
-                list = hibernate.sql(
-                        "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
-                        String.class);
-            } catch (Exception e) {
-                e.printStackTrace();
-                return Result.error(ErrorCode.INTERNAL_ERROR);
+        String parentURL = serverURI + RestContent.PATH + "/" + postId;
+        List<String> list = null;
+        try {
+            list = hibernate.sql(
+                    "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
+                    String.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error(ErrorCode.INTERNAL_ERROR);
+        }
+
+        if (maxTimeout > 0) {
+            String lock = null;
+            synchronized (JavaContentRep.postLocks) {
+                lock = JavaContentRep.postLocks.get(postId);
             }
+            synchronized (lock) {
+                long deadline = startOperation + maxTimeout;
 
-            if (maxTimeout > 0) {
-                String lock = null;
-                synchronized (JavaContentRep.postLocks) {
-                    lock = JavaContentRep.postLocks.get(postId);
-                }
-                synchronized (lock) {
-                    long deadline = startOperation + maxTimeout;
+                while (System.currentTimeMillis() < deadline) {
 
-                    while (System.currentTimeMillis() < deadline) {
-
-                        try {
-                            long waitTime = deadline - System.currentTimeMillis();
-                            if(waitTime > 0)
-                                lock.wait(waitTime);
-                        } catch (InterruptedException e) {
-                            // Ignore this case...
-                        }
-
-                        List<String> redo = null;
-                        try {
-                            redo = hibernate.sql("SELECT p.postId from Post p WHERE p.parentURL='" + parentURL
-                                    + "' ORDER BY p.creationTimestamp", String.class);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            return Result.error(ErrorCode.INTERNAL_ERROR);
-                        }
-
-                        if (redo.size() > list.size()) {
-                            list = redo;
-                            break;
-                        }
-
+                    try {
+                        long waitTime = deadline - System.currentTimeMillis();
+                        if (waitTime > 0)
+                            lock.wait(waitTime);
+                    } catch (InterruptedException e) {
+                        // Ignore this case...
                     }
+
+                    List<String> redo = null;
+                    try {
+                        redo = hibernate.sql("SELECT p.postId from Post p WHERE p.parentURL='" + parentURL
+                                + "' ORDER BY p.creationTimestamp", String.class);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return Result.error(ErrorCode.INTERNAL_ERROR);
+                    }
+
+                    if (redo.size() > list.size()) {
+                        list = redo;
+                        break;
+                    }
+
                 }
             }
+        }
 
-            return Result.ok(list);
+        return Result.ok(list);
     }
 
     @Override
@@ -301,9 +308,9 @@ try {
 
         Result<Post> res = pc.updatePost(postId, userPassword, post);
         Post p;
-        if(!res.isOK()){
+        if (!res.isOK()) {
             return res;
-        }else{
+        } else {
             p = res.value();
         }
 
@@ -313,7 +320,7 @@ try {
         Result<?> r = syncPoint.waitForResult(offset);
 
 
-        if (r.isOK()) return Result.ok((Post) r.value()) ;
+        if (r.isOK()) return Result.ok((Post) r.value());
         else {
             Log.info("Erro no syncPoint!? " + r.error());
             return Result.error(r.error());

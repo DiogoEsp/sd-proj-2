@@ -34,6 +34,36 @@ public class ImageServer {
 
 
     public static void main(String[] args) {
+        KafkaUtils.createTopic("posts");
+        KafkaUtils.createTopic("images");
+        KafkaSubscriber subscriber = KafkaSubscriber.createSubscriber("kafka:9092", List.of("posts"));
+        KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
+        JavaImage.setKafka(pub);
+        subscriber.start(new RecordProcessor() {
+            @Override
+            public void onReceive(ConsumerRecord<String, String> r) {
+                try {
+                    String[] value = r.value().split(" ");
+                    String operation = value[0];
+                    String mediaUrl = value[1];
+                    String[] bMediaUrl = mediaUrl.split("/");
+
+                    int dot = bMediaUrl[bMediaUrl.length - 1].indexOf('.');
+                    String cleanImageId = (dot == -1) ? bMediaUrl[bMediaUrl.length - 1]
+                            : bMediaUrl[bMediaUrl.length - 1].substring(0, dot);
+                    String all = bMediaUrl[bMediaUrl.length - 2] + "/" + cleanImageId;
+
+                    System.out.println("Formatted Version: " + operation + " " + all);
+                    switch (operation) {
+                        case "create" -> JavaImage.incrementRef(all);
+                        case "delete" -> JavaImage.decrementRef(all);
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error: " + e.getMessage());
+                }
+            }
+        });
+        JavaImage.handleImageDeletion();
         try {
 
             String arg = args[0];
@@ -54,38 +84,6 @@ public class ImageServer {
             JavaImage.setDiscovery(d);
             d.start();
 
-            KafkaUtils.createTopic("posts");
-            KafkaUtils.createTopic("images");
-            KafkaSubscriber subscriber = KafkaSubscriber.createSubscriber("kafka:9092", List.of("posts"));
-
-            subscriber.start(new RecordProcessor() {
-                @Override
-                public void onReceive(ConsumerRecord<String, String> r) {
-                    try {
-                        String[] value = r.value().split(" ");
-                        String operation = value[0];
-                        String mediaUrl = value[1];
-                        String[] bMediaUrl = mediaUrl.split("/");
-
-                        int dot = bMediaUrl[bMediaUrl.length - 1].indexOf('.');
-                        String cleanImageId = (dot == -1) ? bMediaUrl[bMediaUrl.length - 1]
-                                : bMediaUrl[bMediaUrl.length - 1].substring(0, dot);
-                        String all = bMediaUrl[bMediaUrl.length - 2] + "/" + cleanImageId;
-
-                        System.out.println("Formatted Version: " + operation + " " + all);
-                        switch (operation) {
-                            case "create" -> JavaImage.incrementRef(all);
-                            case "delete" -> JavaImage.decrementRef(all);
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Error: " + e.getMessage());
-                    }
-                }
-            });
-            JavaImage.handleImageDeletion();
-
-            KafkaPublisher pub = KafkaPublisher.createPublisher("kafka:9092");
-            JavaImage.setKafka(pub);
 
         } catch (Exception e) {
             Log.severe(e.getMessage());

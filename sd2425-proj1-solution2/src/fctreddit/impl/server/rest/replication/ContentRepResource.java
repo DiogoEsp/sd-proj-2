@@ -13,11 +13,12 @@ import java.util.List;
 import java.util.logging.Logger;
 
 public class ContentRepResource extends RestResource implements RestContent {
+
     private Content impl;
     private Logger Log= Logger.getLogger(ContentRepResource.class.getName());
 
     public ContentRepResource() {
-        this.impl = new JavaContentRep();
+        this.impl = JavaContentRep.getInstance();
     }
 
     @Override
