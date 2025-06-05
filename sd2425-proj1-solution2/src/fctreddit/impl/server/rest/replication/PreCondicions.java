@@ -115,17 +115,84 @@ public class PreCondicions extends JavaServer implements Content {
 
     @Override
     public Result<Void> upVotePost(String postId, String userId, String userPassword) {
-        return null;
+        Log.info("Executing upVote on " + postId + " with Userid:" + userId + " Password: " + userPassword);
+
+        if (userPassword == null)
+            return Result.error(Result.ErrorCode.FORBIDDEN);
+
+        Result<User> u = usersClient.getUser(userId, userPassword);
+        if (!u.isOK())
+            return Result.error(u.error());
+
+        Log.info("Retrieved user: " + u.value());
+
+        Hibernate.TX tx = hibernate.beginTransaction();
+
+        Post p = hibernate.get(tx, Post.class, postId);
+
+        if (p == null) {
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+        }
+
+        hibernate.abortTransaction(tx);
+
+        return Result.ok();
     }
+
 
     @Override
     public Result<Void> removeUpVotePost(String postId, String userId, String userPassword) {
-        return null;
+        Log.info("Executing removeUpVote on " + postId + " with Userid:" + userId + " Password: " + userPassword);
+
+        if (userPassword == null)
+            return Result.error(Result.ErrorCode.FORBIDDEN);
+
+        Result<User> u = this.getUsersClient().getUser(userId, userPassword);
+        if (!u.isOK())
+            return Result.error(u.error());
+
+        Log.info("Retrieved user: " + u.value());
+
+        Hibernate.TX tx = hibernate.beginTransaction();
+
+        List<PostVote> i = hibernate.sql(tx, "SELECT * from PostVote pv WHERE pv.userId='" + userId
+                + "' AND pv.postId='" + postId + "' AND pv.upVote='true'", PostVote.class);
+        if (i.size() == 0) {
+            hibernate.abortTransaction(tx);
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+        }
+
+        hibernate.abortTransaction(tx);
+
+        return Result.ok();
     }
 
     @Override
     public Result<Void> downVotePost(String postId, String userId, String userPassword) {
-        return null;
+        Log.info("Executing downVote on " + postId + " with Userid:" + userId + " Password: " + userPassword);
+
+        if (userPassword == null)
+            return Result.error(Result.ErrorCode.FORBIDDEN);
+
+        Result<User> u = usersClient.getUser(userId, userPassword);
+        if (!u.isOK())
+            return Result.error(u.error());
+
+        Log.info("Retrieved user: " + u.value());
+
+        Hibernate.TX tx = hibernate.beginTransaction();
+
+        Post p = hibernate.get(tx, Post.class, postId);
+
+        if (p == null) {
+            hibernate.abortTransaction(tx);
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+        }
+
+        hibernate.abortTransaction(tx);
+
+        return Result.ok();
+
     }
 
     @Override
@@ -185,38 +252,60 @@ public class PreCondicions extends JavaServer implements Content {
 
     @Override
     public Result<List<String>> getPostAnswers(String postId, long maxTimeout) {
+        long startOperation = System.currentTimeMillis();
         Log.info("Getting Answers for Post " + postId + " maxTimeout=" + maxTimeout);
 
         Post p = hibernate.get(Post.class, postId);
         if (p == null)
             return Result.error(Result.ErrorCode.NOT_FOUND);
 
+        String parentURL = RestContent.PATH + "/" + postId;
+        List<String> list = null;
+        try {
+            list = hibernate.sql(
+                    "SELECT p.postId from Post p WHERE p.parentURL LIKE '" + parentURL + "' ORDER BY p.creationTimestamp",
+                    String.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
+        }
+
         if (maxTimeout > 0) {
             String lock = null;
             synchronized (JavaContentRep.postLocks) {
                 lock = JavaContentRep.postLocks.get(postId);
             }
-
             synchronized (lock) {
-                try {
-                    lock.wait(maxTimeout);
-                } catch (InterruptedException e) {
-                    // Ignore this case...
+                long deadline = startOperation + maxTimeout;
+
+                while (System.currentTimeMillis() < deadline) {
+
+                    try {
+                        long waitTime = deadline - System.currentTimeMillis();
+                        if(waitTime > 0)
+                            lock.wait(waitTime);
+                    } catch (InterruptedException e) {
+                        // Ignore this case...
+                    }
+
+                    List<String> redo = null;
+                    try {
+                        redo = hibernate.sql("SELECT p.postId from Post p WHERE p.parentURL='" + parentURL
+                                + "' ORDER BY p.creationTimestamp", String.class);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return Result.error(Result.ErrorCode.INTERNAL_ERROR);
+                    }
+
+                    if (redo.size() > list.size()) {
+                        list = redo;
+                        break;
+                    }
+
                 }
             }
         }
 
-        String parentURL = JavaContentRep.serverURI + RestContent.PATH + "/" + postId;
-
-        try {
-            List<String> list = null;
-            list = hibernate.sql(
-                    "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
-                    String.class);
-            return Result.ok(list);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
-        }
+        return Result.ok(list);
     }
 }

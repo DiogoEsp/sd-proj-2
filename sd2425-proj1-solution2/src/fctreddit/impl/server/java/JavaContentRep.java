@@ -32,6 +32,10 @@ public class JavaContentRep extends JavaServer implements Content {
     private static final String CREATE = "CREATE";
     private static final String UPDATE = "UPDATE";
     private static final String GET = "GET";
+    private static final String UP_VOTE = "UPVOTE";
+    private static final String DOWN_VOTE = "DOWNVOTE";
+    private static final String RDOWN_VOTE = "RDOWNVOTE";
+    private static final String RUP_VOTE = "RUPVOTE";
 
     private static Logger Log = Logger.getLogger(JavaContentRep.class.getName());
     private static final Gson gson = new Gson();
@@ -118,13 +122,23 @@ public class JavaContentRep extends JavaServer implements Content {
                     String[] args = json.split("///");
                     Post p = gson.fromJson(args[0], Post.class);
                     Post post = gson.fromJson(args[1], Post.class);
-                    Result<Post> res = ce.updatepost(p, post);
+                    Result<Post> res = ce.updatePost(p, post);
                     try {
                         syncPoint.setResult(offset, res);
                     } catch (Exception e) {
                         Log.severe(e.getMessage());
                     }
                 }
+                case UP_VOTE -> {
+                    String[] args = json.split("///");
+                    Result<Void> res = ce.upVote(args[0], args[1]);
+                    syncPoint.setResult(offset, res);
+                }
+                case DOWN_VOTE -> { String[] args = json.split("///");
+                    Result<Void> res = ce.downVote(args[0], args[1]);
+                    syncPoint.setResult(offset, res);}
+                case RDOWN_VOTE -> {}
+                case RUP_VOTE -> {}
                 default -> System.out.println("Unknown operation");
             }
         } catch (Exception e) {
@@ -174,8 +188,8 @@ public class JavaContentRep extends JavaServer implements Content {
                         + "p.parentURL IS NULL) ORDER BY upVotes DESC, postID ASC";
             } else if (sortOrder.equalsIgnoreCase(Content.MOST_REPLIES)) {
                 baseSQLStatement = "SELECT postId FROM (SELECT p.postId as postId, "
-                        + "(SELECT COUNT(*) FROM Post p2 where p2.parentUrl = CONCAT('" + JavaContentRep.serverURI
-                        + RestContentRep.PATH + "/',p.postId)) as replies " + "from Post p WHERE "
+                        + "(SELECT COUNT(*) FROM Post p2 where p2.parentUrl LIKE CONCAT('"
+                        + RestContent.PATH + "/',p.postId)) as replies " + "from Post p WHERE "
                         + (timestamp > 0 ? "p.creationTimestamp >= '" + timestamp + "' AND " : "")
                         + "p.parentURL IS NULL) ORDER BY replies DESC, postID ASC";
             } else {
@@ -215,6 +229,7 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<List<String>> getPostAnswers(String postId, long maxTimeout) {
+        syncPoint.waitForVersion(VersionFilter.version.get());
         return pc.getPostAnswers(postId, maxTimeout);
     }
 
@@ -322,35 +337,21 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<Void> upVotePost(String postId, String userId, String userPassword) {
-        Log.info("Executing upVote on " + postId + " with Userid:" + userId + " Password: " + userPassword);
+        Result<Void> res = pc.upVotePost(postId, userId, userPassword);
 
-        if (userPassword == null)
-            return Result.error(ErrorCode.FORBIDDEN);
-
-        Result<User> u = this.getUsersClient().getUser(userId, userPassword);
-        if (!u.isOK())
-            return Result.error(u.error());
-
-        Log.info("Retrieved user: " + u.value());
-
-        TX tx = hibernate.beginTransaction();
-
-        Post p = hibernate.get(tx, Post.class, postId);
-
-        if (p == null) {
-            hibernate.abortTransaction(tx);
-            return Result.error(ErrorCode.NOT_FOUND);
+        if(!res.isOK()){
+            return res;
         }
 
-        try {
-            hibernate.persist(tx, new PostVote(userId, postId, true));
-            hibernate.commitTransaction(tx);
-        } catch (Exception e) {
-            hibernate.abortTransaction(tx);
-            return Result.error(ErrorCode.CONFLICT);
-        }
+        String message = userId + "///" + postId;
+        long offset = publisher.publish(REP_TOPIC, UP_VOTE, message);
+        Result<?> r = syncPoint.waitForResult(offset);
 
-        return Result.ok();
+        if (r.isOK()) return Result.ok();
+        else {
+            Log.info("Erro no syncPoint!? " + r.error());
+            return Result.error(r.error());
+        }
     }
 
     @Override
@@ -388,35 +389,21 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<Void> downVotePost(String postId, String userId, String userPassword) {
-        Log.info("Executing downVote on " + postId + " with Userid:" + userId + " Password: " + userPassword);
+        Result<Void> res = pc.downVotePost(postId, userId, userPassword);
 
-        if (userPassword == null)
-            return Result.error(ErrorCode.FORBIDDEN);
-
-        Result<User> u = this.getUsersClient().getUser(userId, userPassword);
-        if (!u.isOK())
-            return Result.error(u.error());
-
-        Log.info("Retrieved user: " + u.value());
-
-        TX tx = hibernate.beginTransaction();
-
-        Post p = hibernate.get(tx, Post.class, postId);
-
-        if (p == null) {
-            hibernate.abortTransaction(tx);
-            return Result.error(ErrorCode.NOT_FOUND);
+        if(!res.isOK()){
+            return res;
         }
 
-        try {
-            hibernate.persist(tx, new PostVote(userId, postId, false));
-            hibernate.commitTransaction(tx);
-        } catch (Exception e) {
-            hibernate.abortTransaction(tx);
-            return Result.error(ErrorCode.CONFLICT);
-        }
+        String message = userId + "///" + postId;
+        long offset = publisher.publish(REP_TOPIC, DOWN_VOTE, message);
+        Result<?> r = syncPoint.waitForResult(offset);
 
-        return Result.ok();
+        if (r.isOK()) return Result.ok();
+        else {
+            Log.info("Erro no syncPoint!? " + r.error());
+            return Result.error(r.error());
+        }
     }
 
     @Override

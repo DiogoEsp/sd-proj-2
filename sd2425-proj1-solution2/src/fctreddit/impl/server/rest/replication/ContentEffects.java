@@ -102,7 +102,7 @@ public class ContentEffects extends JavaServer {
         return Result.ok(post.getPostId());
     }
 
-    public Result<Post> updatepost(Post p, Post post) {
+    public Result<Post> updatePost(Post p, Post post) {
 
         Hibernate.TX tx = hibernate.beginTransaction();
 
