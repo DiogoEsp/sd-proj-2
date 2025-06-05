@@ -16,7 +16,7 @@ public class VersionFilter implements ContainerResponseFilter, ContainerRequestF
 
     public static final ThreadLocal<Long> version = new ThreadLocal<>();
 
-    public static final String HEADER_VERSION = " X-FCTREDDIT";
+    public static final String HEADER_VERSION = "X-FCTREDDIT";
 
     public VersionFilter(){
         this.versionManager = SyncPoint.getSyncPoint();

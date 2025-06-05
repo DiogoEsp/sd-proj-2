@@ -1,16 +1,22 @@
 package fctreddit.impl.server.rest.replication;
 
 import fctreddit.api.Post;
+import fctreddit.api.PostVote;
 import fctreddit.api.User;
+import fctreddit.api.java.Content;
 import fctreddit.api.java.Result;
 import fctreddit.api.java.Users;
 import fctreddit.api.rest.RestContent;
 import fctreddit.impl.server.Hibernate;
+import fctreddit.impl.server.java.JavaContent;
+import fctreddit.impl.server.java.JavaContentRep;
+import fctreddit.impl.server.java.JavaServer;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Logger;
 
-public class PreCondicions  {
+public class PreCondicions extends JavaServer implements Content {
     private static Logger Log = Logger.getLogger(PreCondicions.class.getName());
 
     private Hibernate hibernate;
@@ -21,6 +27,7 @@ public class PreCondicions  {
         this.usersClient = usersClient;
     }
 
+    @Override
     public Result<String> createPost(Post post, String userPassword){
         Log.info("Checking Pre Conditions for CreatePost");
         if (post.getAuthorId() == null || post.getAuthorId().isBlank() || post.getContent() == null
@@ -40,6 +47,12 @@ public class PreCondicions  {
         return Result.ok();
     }
 
+    @Override
+    public Result<List<String>> getPosts(long timestamp, String sortOrder) {
+        return null;
+    }
+
+    @Override
     public Result<Post> updatePost(String postId, String userPassword, Post post){
         Hibernate.TX tx = hibernate.beginTransaction();
 
@@ -95,12 +108,115 @@ public class PreCondicions  {
         return Result.ok(p);
     }
 
-    public Result<Post> getPost(Post p) {
-        Log.info("PRE Checking Null Post: " + (p == null));
+    @Override
+    public Result<Void> deletePost(String postId, String userPassword) {
+        return null;
+    }
+
+    @Override
+    public Result<Void> upVotePost(String postId, String userId, String userPassword) {
+        return null;
+    }
+
+    @Override
+    public Result<Void> removeUpVotePost(String postId, String userId, String userPassword) {
+        return null;
+    }
+
+    @Override
+    public Result<Void> downVotePost(String postId, String userId, String userPassword) {
+        return null;
+    }
+
+    @Override
+    public Result<Void> removeDownVotePost(String postId, String userId, String userPassword) {
+        return null;
+    }
+
+    @Override
+    public Result<Integer> getupVotes(String postId) {
+        Log.info("Executing getUpVotes on " + postId);
+        Post p = hibernate.get(Post.class, postId);
+        if (p == null)
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+
+        List<Integer> count = hibernate.sql(
+                "SELECT COUNT(*) from PostVote pv WHERE pv.postId='" + postId + "'  AND pv.upVote='true'",
+                Integer.class);
+        return Result.ok(count.iterator().next());
+
+    }
+
+    @Override
+    public Result<Integer> getDownVotes(String postId) {
+        Log.info("Executing getDownVotes on " + postId);
+        Post p = hibernate.get(Post.class, postId);
+        if (p == null)
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+
+        List<Integer> count = hibernate.sql(
+                "SELECT COUNT(*) from PostVote pv WHERE pv.postId='" + postId + "' AND pv.upVote='false'",
+                Integer.class);
+        return Result.ok(count.iterator().next());
+    }
+
+    @Override
+    public Result<Void> removeTracesOfUser(String userId) {
+        return null;
+    }
+
+    @Override
+    public Result<Post> getPost(String postId) {
+        Log.info("PRE Checking Null Post: ");
+
+        Post p = hibernate.get(Post.class, postId);
+
+        Result<Integer> res = this.getupVotes(postId);
+        if (res.isOK())
+            p.setUpVote(res.value());
+        res = this.getDownVotes(postId);
+        if (res.isOK())
+            p.setDownVote(res.value());
 
         if (p != null)
-            return Result.ok();
+            return Result.ok(p);
         else return Result.error(Result.ErrorCode.NOT_FOUND);
     }
 
+    @Override
+    public Result<List<String>> getPostAnswers(String postId, long maxTimeout) {
+        Log.info("Getting Answers for Post " + postId + " maxTimeout=" + maxTimeout);
+
+        Post p = hibernate.get(Post.class, postId);
+        if (p == null)
+            return Result.error(Result.ErrorCode.NOT_FOUND);
+
+        if (maxTimeout > 0) {
+            String lock = null;
+            synchronized (JavaContentRep.postLocks) {
+                lock = JavaContentRep.postLocks.get(postId);
+            }
+
+            synchronized (lock) {
+                try {
+                    lock.wait(maxTimeout);
+                } catch (InterruptedException e) {
+                    // Ignore this case...
+                }
+            }
+        }
+
+        String parentURL = JavaContentRep.serverURI + RestContent.PATH + "/" + postId;
+
+        try {
+            List<String> list = null;
+            list = hibernate.sql(
+                    "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
+                    String.class);
+            return Result.ok(list);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error(Result.ErrorCode.INTERNAL_ERROR);
+        }
+    }
 }

@@ -7,6 +7,7 @@ import fctreddit.api.rest.RestContent;
 import fctreddit.impl.server.java.JavaContentRep;
 import fctreddit.impl.server.rest.RestResource;
 import fctreddit.impl.server.rest.filter.VersionFilter;
+import fctreddit.utils.SyncPoint;
 import jakarta.ws.rs.WebApplicationException;
 
 import java.util.List;
@@ -16,9 +17,11 @@ public class ContentRepResource extends RestResource implements RestContent {
 
     private Content impl;
     private Logger Log= Logger.getLogger(ContentRepResource.class.getName());
+    private SyncPoint syncPoint;
 
     public ContentRepResource() {
         this.impl = JavaContentRep.getInstance();
+        this.syncPoint = SyncPoint.getSyncPoint();
     }
 
     @Override
@@ -37,6 +40,9 @@ public class ContentRepResource extends RestResource implements RestContent {
 
     @Override
     public List<String> getPosts(long timestamp, String sortOrder) {
+        Long version = VersionFilter.version.get();
+        syncPoint.waitForVersion(version);
+
         Result<List<String>> res = impl.getPosts(timestamp, sortOrder);
 
         if(res.isOK())
@@ -47,9 +53,10 @@ public class ContentRepResource extends RestResource implements RestContent {
 
     @Override
     public Post getPost(String postId) {
-        Result<Post> res = impl.getPost(postId);
+        Long version = VersionFilter.version.get();
 
-        Long clientVersion = VersionFilter.version.get();
+        syncPoint.waitForVersion(version);
+        Result<Post> res = impl.getPost(postId);
 
         if(res.isOK())
             return res.value();
@@ -59,9 +66,9 @@ public class ContentRepResource extends RestResource implements RestContent {
 
     @Override
     public List<String> getPostAnswers(String postId, long timeout) {
+        Long version = VersionFilter.version.get();
+        syncPoint.waitForVersion(version);
         Result<List<String>> res = impl.getPostAnswers(postId, timeout);
-
-        Long clientVersion = VersionFilter.version.get();
 
         if(res.isOK()) {
             return res.value();
@@ -134,9 +141,10 @@ public class ContentRepResource extends RestResource implements RestContent {
 
     @Override
     public Integer getupVotes(String postId) {
-        Result<Integer> res = impl.getupVotes(postId);
+        Long version = VersionFilter.version.get();
+        syncPoint.waitForVersion(version);
 
-        Long clientVersion = VersionFilter.version.get();
+        Result<Integer> res = impl.getupVotes(postId);
 
         if(!res.isOK())
             throw new WebApplicationException(errorCodeToStatus(res.error()));
@@ -146,9 +154,10 @@ public class ContentRepResource extends RestResource implements RestContent {
 
     @Override
     public Integer getDownVotes(String postId) {
-        Result<Integer> res = impl.getDownVotes(postId);
+        Long version = VersionFilter.version.get();
+        syncPoint.waitForVersion(version);
 
-        Long clientVersion = VersionFilter.version.get();
+        Result<Integer> res = impl.getDownVotes(postId);
 
         if(!res.isOK())
             throw new WebApplicationException(errorCodeToStatus(res.error()));

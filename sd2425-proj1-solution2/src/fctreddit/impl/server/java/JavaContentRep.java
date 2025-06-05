@@ -26,7 +26,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 public class JavaContentRep extends JavaServer implements Content {
 
-    private static JavaContentRep instance;
+    public static JavaContentRep instance;
     private static final String REP_TOPIC = "replication";
 
     private static final String CREATE = "CREATE";
@@ -39,11 +39,11 @@ public class JavaContentRep extends JavaServer implements Content {
 
     public static final HashMap<String, String> postLocks = new HashMap<String, String>();
 
-    private static String serverURI;
+    public static String serverURI;
     private PreCondicions pc;
     private ContentEffects ce;
     private static KafkaPublisher publisher;
-    private SyncPoint syncPoint = SyncPoint.getSyncPoint();
+    private SyncPoint syncPoint;
     private static KafkaPublisher repPublisher;
 
     public record ReplicationMessage(
@@ -62,6 +62,7 @@ public class JavaContentRep extends JavaServer implements Content {
         hibernate = Hibernate.getInstance();
         this.pc = new PreCondicions(hibernate, getUsersClient());
         this.ce = new ContentEffects(publisher, postLocks, serverURI);
+        this.syncPoint = SyncPoint.getSyncPoint();
     }
 
     public static void setKafka(KafkaPublisher publisher) {
@@ -140,11 +141,13 @@ public class JavaContentRep extends JavaServer implements Content {
         }
         String id = UUID.randomUUID().toString();
         post.setPostId(id);
+        post.setCreationTimestamp(System.currentTimeMillis());
 
 
         String message = gson.toJson(post);
 
         long offset = publisher.publish(REP_TOPIC, CREATE, message);
+
         Result<?> r = syncPoint.waitForResult(offset);
         Log.info("O resultado do syncPoint" + r.toString());
 
@@ -153,13 +156,11 @@ public class JavaContentRep extends JavaServer implements Content {
             Log.info("Erro no syncPoint!? " + r.error());
             return Result.error(r.error());
         }
-
     }
 
     @Override
     public Result<List<String>> getPosts(long timestamp, String sortOrder) {
 
-        syncPoint.waitForVersion(VersionFilter.version.get());
         Log.info("Getting Posts with timestamp=" + timestamp + " sortOrder=" + sortOrder);
 
         String baseSQLStatement = null;
@@ -209,98 +210,12 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<Post> getPost(String postId) {
-        syncPoint.waitForVersion(VersionFilter.version.get());
-        Post p = hibernate.get(Post.class, postId);
-
-        Result<Integer> res = this.getupVotes(postId);
-        if (res.isOK())
-            p.setUpVote(res.value());
-        res = this.getDownVotes(postId);
-        if (res.isOK())
-            p.setDownVote(res.value());
-
-        Log.info("Checking Null Post: " + (p == null));
-        Result<Post> pre = pc.getPost(p);
-
-        if (!pre.isOK())
-            return pre;
-
-        GetPostArg arg = new GetPostArg(GET, postId);
-        String jsonArgs = gson.toJson(arg);
-        ReplicationMessage msg = new ReplicationMessage(GET, jsonArgs);
-        String messageJson = gson.toJson(msg);
-
-        publisher.publish(REP_TOPIC, GET, messageJson);
-        long offset = publisher.publish(REP_TOPIC, GET, messageJson);
-
-        var r = syncPoint.waitForResult(offset);
-        if (r == null) {
-            Log.info("Timout waiting for replication");
-            return Result.error(ErrorCode.INTERNAL_ERROR);
-        }
-
-        if (r.isOK()) return Result.ok((Post) r.value());
-        else return Result.error(r.error());
+        return pc.getPost(postId);
     }
 
     @Override
     public Result<List<String>> getPostAnswers(String postId, long maxTimeout) {
-        syncPoint.waitForVersion(VersionFilter.version.get());
-        long startOperation = System.currentTimeMillis();
-        Log.info("Getting Answers for Post " + postId + " maxTimeout=" + maxTimeout);
-
-        Post p = hibernate.get(Post.class, postId);
-        if (p == null)
-            return Result.error(ErrorCode.NOT_FOUND);
-
-        String parentURL = serverURI + RestContent.PATH + "/" + postId;
-        List<String> list = null;
-        try {
-            list = hibernate.sql(
-                    "SELECT p.postId from Post p WHERE p.parentURL='" + parentURL + "' ORDER BY p.creationTimestamp",
-                    String.class);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Result.error(ErrorCode.INTERNAL_ERROR);
-        }
-
-        if (maxTimeout > 0) {
-            String lock = null;
-            synchronized (JavaContentRep.postLocks) {
-                lock = JavaContentRep.postLocks.get(postId);
-            }
-            synchronized (lock) {
-                long deadline = startOperation + maxTimeout;
-
-                while (System.currentTimeMillis() < deadline) {
-
-                    try {
-                        long waitTime = deadline - System.currentTimeMillis();
-                        if (waitTime > 0)
-                            lock.wait(waitTime);
-                    } catch (InterruptedException e) {
-                        // Ignore this case...
-                    }
-
-                    List<String> redo = null;
-                    try {
-                        redo = hibernate.sql("SELECT p.postId from Post p WHERE p.parentURL='" + parentURL
-                                + "' ORDER BY p.creationTimestamp", String.class);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        return Result.error(ErrorCode.INTERNAL_ERROR);
-                    }
-
-                    if (redo.size() > list.size()) {
-                        list = redo;
-                        break;
-                    }
-
-                }
-            }
-        }
-
-        return Result.ok(list);
+        return pc.getPostAnswers(postId, maxTimeout);
     }
 
     @Override
@@ -539,29 +454,12 @@ public class JavaContentRep extends JavaServer implements Content {
 
     @Override
     public Result<Integer> getupVotes(String postId) {
-        Log.info("Executing getUpVotes on " + postId);
-        Post p = hibernate.get(Post.class, postId);
-        if (p == null)
-            return Result.error(ErrorCode.NOT_FOUND);
-
-        List<Integer> count = hibernate.sql(
-                "SELECT COUNT(*) from PostVote pv WHERE pv.postId='" + postId + "'  AND pv.upVote='true'",
-                Integer.class);
-        return Result.ok(count.iterator().next());
-
+        return pc.getupVotes(postId);
     }
 
     @Override
     public Result<Integer> getDownVotes(String postId) {
-        Log.info("Executing getDownVotes on " + postId);
-        Post p = hibernate.get(Post.class, postId);
-        if (p == null)
-            return Result.error(ErrorCode.NOT_FOUND);
-
-        List<Integer> count = hibernate.sql(
-                "SELECT COUNT(*) from PostVote pv WHERE pv.postId='" + postId + "' AND pv.upVote='false'",
-                Integer.class);
-        return Result.ok(count.iterator().next());
+        return pc.getDownVotes(postId);
     }
 
     @Override
